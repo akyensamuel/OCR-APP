@@ -34,6 +34,13 @@
                     <i class="fas fa-cogs me-2"></i>
                     Use Template
                 </a>
+                <form method="post" action="{% url 'templates:template_deactivate' template.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-{% if template.is_active %}warning{% else %}success{% endif %}">
+                        <i class="fas fa-{% if template.is_active %}pause{% else %}play{% endif %} me-2"></i>
+                        {% if template.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                </form>
                 <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
                     <i class="fas fa-trash me-2"></i>
                     Delete
@@ -328,26 +335,26 @@
 {% block extra_js %}
 <script>
 function editField(fieldName) {
-    alert('Edit field: ' + fieldName + '\n(Feature coming soon)');
+    showInfoToast('Edit field: ' + fieldName + ' (Feature coming soon)');
 }
 
 function reprocessTemplate(templateId) {
     if (confirm('Reprocess this template? This may take a few minutes.')) {
         // Implement reprocessing logic
-        alert('Reprocessing started...');
+        showInfoToast('Reprocessing started...');
     }
 }
 
 function duplicateTemplate(templateId) {
     if (confirm('Create a copy of this template?')) {
         // Implement duplication logic
-        alert('Template duplicated successfully!');
+        showSuccessToast('Template duplicated successfully!');
     }
 }
 
 function exportTemplate(templateId) {
     // Implement export logic
-    alert('Exporting template structure...');
+    showInfoToast('Exporting template structure...');
 }
 </script>
 {% endblock %}

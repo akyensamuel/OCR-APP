@@ -14,4 +14,5 @@ urlpatterns = [
     path('export/<int:document_id>/', views.export_text_document, name='export_text_document'),
     path('delete/<int:document_id>/', views.delete_text_document, name='delete_text_document'),
     path('list/', views.text_document_list, name='text_document_list'),
+    path('api/document/<int:document_id>/', views.document_api_detail, name='document_api_detail'),
 ]

@@ -242,9 +242,21 @@
                         <h6>
                             <i class="fas fa-image me-2"></i>
                             Template Preview
+                            <small class="text-muted">(Click to zoom)</small>
                         </h6>
-                        <div class="text-center">
-                            <img id="templatePreviewImage" src="" alt="Template Preview" class="img-fluid border rounded" style="max-height: 300px;">
+                        <div class="text-center position-relative">
+                            <img id="templatePreviewImage" 
+                                 src="" 
+                                 alt="Template Preview" 
+                                 class="img-fluid border rounded shadow-sm" 
+                                 style="max-height: 400px; cursor: pointer; transition: transform 0.2s;"
+                                 onmouseover="this.style.transform='scale(1.02)'"
+                                 onmouseout="this.style.transform='scale(1)'">
+                            <div class="position-absolute top-0 end-0 m-2">
+                                <span class="badge bg-dark bg-opacity-75">
+                                    <i class="fas fa-search-plus"></i> Click to enlarge
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -458,6 +470,9 @@ function showTemplatePreview(buttonElement) {
     // Update delete button
     updateModalDeleteButton(templateId, templateName);
     
+    // Load and display template image
+    loadTemplateImage(templateId, templateFileUrl);
+    
     // Load field structure
     loadTemplateFields(templateId);
     
@@ -468,8 +483,88 @@ function showTemplatePreview(buttonElement) {
         modal.show();
     } else {
         console.error('Template preview modal not found');
-        alert('Error: Could not open template preview');
+        showErrorToast('Error: Could not open template preview');
     }
+}
+
+// Load and display template image
+function loadTemplateImage(templateId, templateFileUrl) {
+    const templateImageSection = document.getElementById('templateImageSection');
+    const templatePreviewImage = document.getElementById('templatePreviewImage');
+    
+    if (templateFileUrl && templateFileUrl !== 'None' && templateFileUrl !== '' && templateFileUrl !== 'null') {
+        // Ensure URL is properly formatted
+        let imageUrl = templateFileUrl;
+        if (!imageUrl.startsWith('http') && !imageUrl.startsWith('/media/')) {
+            imageUrl = '/media/' + imageUrl;
+        }
+        
+        templatePreviewImage.src = imageUrl;
+        templatePreviewImage.alt = 'Template Preview';
+        templatePreviewImage.style.cursor = 'pointer';
+        
+        // Add click to zoom functionality
+        templatePreviewImage.onclick = function() {
+            openImageZoomModal(imageUrl);
+        };
+        
+        // Handle image load errors
+        templatePreviewImage.onerror = function() {
+            console.warn('Failed to load template image:', imageUrl);
+            templateImageSection.style.display = 'none';
+        };
+        
+        // Show the image section
+        templateImageSection.style.display = 'block';
+    } else {
+        templateImageSection.style.display = 'none';
+    }
+}
+
+// Open image in zoom modal
+function openImageZoomModal(imageUrl) {
+    // Create or get zoom modal
+    let zoomModal = document.getElementById('imageZoomModal');
+    
+    if (!zoomModal) {
+        // Create zoom modal if it doesn't exist
+        const modalHTML = `
+            <div class="modal fade" id="imageZoomModal" tabindex="-1">
+                <div class="modal-dialog modal-xl modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-search-plus me-2"></i>Template Image
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center p-0">
+                            <img id="zoomModalImage" src="" class="img-fluid" style="max-height: 80vh; width: auto;">
+                        </div>
+                        <div class="modal-footer">
+                            <a id="downloadImageBtn" href="" download class="btn btn-success">
+                                <i class="fas fa-download me-2"></i>Download Image
+                            </a>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        zoomModal = document.getElementById('imageZoomModal');
+    }
+    
+    // Update image source
+    const zoomImage = document.getElementById('zoomModalImage');
+    const downloadBtn = document.getElementById('downloadImageBtn');
+    
+    zoomImage.src = imageUrl;
+    downloadBtn.href = imageUrl;
+    
+    // Show modal
+    const modal = new bootstrap.Modal(zoomModal);
+    modal.show();
 }
 
 // Load template field structure

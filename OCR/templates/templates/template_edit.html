@@ -389,15 +389,17 @@ function reprocessTemplate() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(data.message);
-                location.reload(); // Reload to show updated structure
+                showSuccessToast(data.message);
+                setTimeout(() => {
+                    location.reload(); // Reload to show updated structure
+                }, 2000);
             } else {
-                alert('Error reprocessing template: ' + data.error);
+                showErrorToast('Error reprocessing template: ' + data.error);
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error reprocessing template. Please try again.');
+            showErrorToast('Error reprocessing template. Please try again.');
         })
         .finally(() => {
             button.innerHTML = originalText;
@@ -413,7 +415,7 @@ function resetStructure() {
 }
 
 function testTemplate() {
-    alert('Template testing feature coming soon!');
+    showInfoToast('Template testing feature coming soon!');
 }
 </script>
 {% endblock %}

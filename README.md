@@ -213,5 +213,5 @@ For support and questions:
 
 **Version**: 1.0.0  
 **Last Updated**: September 2025  
-**Author**: Samuel Akyenanpon  
+**Author**: Akyen Samuel  
 **Repository**: https://github.com/akyensamuel/OCR-APP

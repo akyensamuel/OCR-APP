@@ -124,3 +124,37 @@ def text_document_list(request):
         'documents': documents,
     }
     return render(request, 'editor/document_list.html', context)
+
+
+def document_api_detail(request, document_id):
+    """API endpoint for document details (for preview modal)"""
+    try:
+        document = get_object_or_404(TextDocument, id=document_id)
+        
+        # Get file URL if available
+        file_url = ''
+        if document.original_file:
+            try:
+                file_url = document.original_file.url
+            except:
+                file_url = str(document.original_file) if document.original_file else ''
+        
+        return JsonResponse({
+            'success': True,
+            'document': {
+                'id': document.id,
+                'title': document.title,
+                'extracted_text': document.extracted_text,
+                'confidence_score': document.confidence_score,
+                'word_count': document.word_count,
+                'char_count': document.char_count,
+                'created_at': document.created_at.strftime('%Y-%m-%d %H:%M'),
+                'processing_status': document.get_processing_status_display(),
+                'original_file': file_url,
+            }
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)

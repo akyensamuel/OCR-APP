@@ -259,6 +259,94 @@ def template_delete(request, template_id):
     return render(request, 'templates/template_delete.html', {'template': template})
 
 
+def template_deactivate(request, template_id):
+    """Deactivate/reactivate a template"""
+    template = get_object_or_404(Template, id=template_id)
+    
+    if request.method == 'POST':
+        # Toggle active status
+        template.is_active = not template.is_active
+        template.save()
+        
+        status = "deactivated" if not template.is_active else "reactivated"
+        messages.success(request, f'Template "{template.name}" has been {status}.')
+        return redirect('templates:template_detail', template_id=template.pk)
+    
+    return redirect('templates:template_detail', template_id=template.pk)
+
+
+def template_archive(request, template_id):
+    """Archive a template (soft delete)"""
+    template = get_object_or_404(Template, id=template_id)
+    
+    if request.method == 'POST':
+        # Set as inactive and add archived flag
+        template.is_active = False
+        template.save()
+        
+        messages.success(request, f'Template "{template.name}" has been archived successfully.')
+        return redirect('templates:template_list')
+    
+    return redirect('templates:template_detail', template_id=template.pk)
+
+
+def template_duplicate(request, template_id):
+    """Create a duplicate/backup copy of a template"""
+    original_template = get_object_or_404(Template, id=template_id)
+    
+    if request.method == 'POST':
+        # Create a duplicate by copying the template
+        from django.core.files.base import ContentFile
+        
+        duplicate = Template.objects.create(
+            name=f"{original_template.name} (Copy)",
+            description=original_template.description,
+            structure=original_template.structure,
+            created_by=request.user if request.user.is_authenticated else None,
+            processing_status=original_template.processing_status,
+            is_active=original_template.is_active
+        )
+        
+        # Copy the file if it exists
+        if original_template.file:
+            try:
+                file_content = original_template.file.read()
+                duplicate.file.save(
+                    original_template.file.name,
+                    ContentFile(file_content),
+                    save=True
+                )
+            except Exception as e:
+                print(f"Error copying template file: {e}")
+        
+        messages.success(request, f'Backup copy "{duplicate.name}" created successfully.')
+        return redirect('templates:template_detail', template_id=duplicate.pk)
+    
+    return redirect('templates:template_detail', template_id=template_id)
+
+
+def template_export(request, template_id):
+    """Export template structure as JSON"""
+    template = get_object_or_404(Template, id=template_id)
+    
+    # Prepare export data
+    export_data = {
+        'name': template.name,
+        'description': template.description,
+        'structure': template.structure,
+        'field_count': template.field_count,
+        'created_at': str(template.created_at),
+        'updated_at': str(template.updated_at),
+    }
+    
+    # Create JSON response
+    import json
+    response = JsonResponse(export_data)
+    response['Content-Disposition'] = f'attachment; filename="{template.name}_structure.json"'
+    
+    return response
+
+
 def process_template(request, template_id):
     """Process documents using this template"""
     template = get_object_or_404(Template, id=template_id)
@@ -297,10 +385,26 @@ def process_template(request, template_id):
             )
             
             # Create Document record
+            # Get current user or create a default user if not authenticated
+            if request.user.is_authenticated:
+                uploaded_by = request.user
+            else:
+                # Get or create a default "anonymous" user for unauthenticated uploads
+                from django.contrib.auth.models import User
+                uploaded_by, created = User.objects.get_or_create(
+                    username='anonymous',
+                    defaults={
+                        'email': 'anonymous@example.com',
+                        'first_name': 'Anonymous',
+                        'last_name': 'User'
+                    }
+                )
+            
             document = Document.objects.create(
                 name=uploaded_file.name,
                 file=file_path,
                 template=template,
+                uploaded_by=uploaded_by,
                 extracted_data={
                     'fields': [
                         {

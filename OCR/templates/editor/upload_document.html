@@ -1,0 +1,355 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Upload Document - OCR Editor{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .upload-area {
+        border: 3px dashed #dee2e6;
+        border-radius: 10px;
+        padding: 3rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+        cursor: pointer;
+    }
+    
+    .upload-area:hover,
+    .upload-area.dragover {
+        border-color: #0d6efd;
+        background: #e7f1ff;
+    }
+    
+    .upload-area i {
+        font-size: 4rem;
+        color: #6c757d;
+        margin-bottom: 1rem;
+    }
+    
+    .upload-area.dragover i {
+        color: #0d6efd;
+    }
+    
+    .file-info {
+        display: none;
+        margin-top: 1rem;
+    }
+    
+    .file-info.show {
+        display: block;
+    }
+    
+    .supported-formats {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+    }
+    
+    .format-badge {
+        background: #fff;
+        border: 1px solid #dee2e6;
+        padding: 0.5rem 1rem;
+        border-radius: 5px;
+        font-size: 0.875rem;
+    }
+    
+    .format-badge i {
+        color: #0d6efd;
+        margin-right: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="upload-container">
+        <!-- Header -->
+        <div class="text-center mb-4">
+            <h2 class="mb-2">
+                <i class="fas fa-cloud-upload-alt text-primary"></i> Upload Document
+            </h2>
+            <p class="text-muted">
+                Upload an image or PDF document to extract text using OCR technology
+            </p>
+        </div>
+
+        <!-- Upload Form -->
+        <form method="POST" enctype="multipart/form-data" id="uploadForm">
+            {% csrf_token %}
+            
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <!-- Drag & Drop Area -->
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h4>Drag & Drop Your Document Here</h4>
+                        <p class="text-muted mb-3">or click to browse files</p>
+                        <input type="file" 
+                               name="document_file" 
+                               id="documentFile" 
+                               accept="image/*,application/pdf"
+                               class="d-none" 
+                               required>
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('documentFile').click()">
+                            <i class="fas fa-folder-open"></i> Browse Files
+                        </button>
+                    </div>
+
+                    <!-- File Info -->
+                    <div class="file-info" id="fileInfo">
+                        <div class="alert alert-info d-flex align-items-center">
+                            <i class="fas fa-file fa-2x me-3"></i>
+                            <div class="flex-grow-1">
+                                <strong>Selected File:</strong>
+                                <p class="mb-0" id="fileName"></p>
+                                <small class="text-muted" id="fileSize"></small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearFile()">
+                                <i class="fas fa-times"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Supported Formats -->
+                    <div class="supported-formats mt-3">
+                        <div class="format-badge">
+                            <i class="fas fa-file-image"></i> JPG
+                        </div>
+                        <div class="format-badge">
+                            <i class="fas fa-file-image"></i> PNG
+                        </div>
+                        <div class="format-badge">
+                            <i class="fas fa-file-image"></i> TIFF
+                        </div>
+                        <div class="format-badge">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </div>
+                        <div class="format-badge">
+                            <i class="fas fa-file-image"></i> BMP
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processing Options -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cog"></i> Processing Options
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="autoCorrect" checked>
+                                <label class="form-check-label" for="autoCorrect">
+                                    <i class="fas fa-spell-check text-primary"></i> Auto-correct spelling
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="removeBlankLines" checked>
+                                <label class="form-check-label" for="removeBlankLines">
+                                    <i class="fas fa-align-left text-primary"></i> Remove blank lines
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="preserveFormat">
+                                <label class="form-check-label" for="preserveFormat">
+                                    <i class="fas fa-file-alt text-primary"></i> Preserve formatting
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="detectLanguage" checked>
+                                <label class="form-check-label" for="detectLanguage">
+                                    <i class="fas fa-language text-primary"></i> Auto-detect language
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{% url 'editor:text_document_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to List
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn">
+                    <i class="fas fa-upload"></i> Upload & Process
+                </button>
+            </div>
+        </form>
+
+        <!-- Processing Indicator -->
+        <div class="card shadow-sm mt-3 d-none" id="processingIndicator">
+            <div class="card-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Processing...</span>
+                </div>
+                <h5>Processing Your Document</h5>
+                <p class="text-muted mb-0">
+                    Please wait while we extract text from your document...
+                </p>
+                <div class="progress mt-3" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         style="width: 75%">
+                        Analyzing...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Section -->
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="fas fa-robot fa-3x text-primary mb-3"></i>
+                        <h5>AI-Powered OCR</h5>
+                        <p class="text-muted small">
+                            Advanced OCR technology extracts text with high accuracy
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="fas fa-edit fa-3x text-success mb-3"></i>
+                        <h5>Editable Results</h5>
+                        <p class="text-muted small">
+                            Edit extracted text with our built-in text editor
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="fas fa-download fa-3x text-info mb-3"></i>
+                        <h5>Export Options</h5>
+                        <p class="text-muted small">
+                            Export your text in various formats
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('documentFile');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const processingIndicator = document.getElementById('processingIndicator');
+
+    // Click to upload
+    uploadArea.addEventListener('click', function(e) {
+        if (e.target !== fileInput && !e.target.closest('button')) {
+            fileInput.click();
+        }
+    });
+
+    // File selection
+    fileInput.addEventListener('change', function(e) {
+        if (this.files && this.files[0]) {
+            displayFileInfo(this.files[0]);
+        }
+    });
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            displayFileInfo(files[0]);
+        }
+    });
+
+    // Display file info
+    function displayFileInfo(file) {
+        fileName.textContent = file.name;
+        fileSize.textContent = `Size: ${formatFileSize(file.size)}`;
+        fileInfo.classList.add('show');
+    }
+
+    // Format file size
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // Clear file
+    function clearFile() {
+        fileInput.value = '';
+        fileInfo.classList.remove('show');
+    }
+
+    // Form submission
+    uploadForm.addEventListener('submit', function(e) {
+        if (!fileInput.files || fileInput.files.length === 0) {
+            e.preventDefault();
+            showErrorToast('Please select a file to upload');
+            return;
+        }
+
+        // Show processing indicator
+        uploadBtn.disabled = true;
+        processingIndicator.classList.remove('d-none');
+        
+        // Simulate progress (optional)
+        let progress = 0;
+        const progressBar = processingIndicator.querySelector('.progress-bar');
+        const interval = setInterval(() => {
+            progress += 5;
+            if (progress <= 90) {
+                progressBar.style.width = progress + '%';
+            } else {
+                clearInterval(interval);
+            }
+        }, 200);
+    });
+</script>
+{% endblock %}

@@ -39,10 +39,25 @@ def document_upload(request):
             ocr_engine = OCREngine()
             ocr_result = ocr_engine.extract_text(full_path)
             
+            # Get current user or create default user
+            if request.user.is_authenticated:
+                uploaded_by = request.user
+            else:
+                from django.contrib.auth.models import User
+                uploaded_by, created = User.objects.get_or_create(
+                    username='anonymous',
+                    defaults={
+                        'email': 'anonymous@example.com',
+                        'first_name': 'Anonymous',
+                        'last_name': 'User'
+                    }
+                )
+            
             # Create Document record
             document = Document.objects.create(
                 name=uploaded_file.name,
                 file=file_path,
+                uploaded_by=uploaded_by,
                 extracted_data={
                     'text': ocr_result.text,
                     'confidence': ocr_result.confidence,
@@ -92,11 +107,26 @@ def document_upload_with_template(request, template_id):
                 full_path, template.structure or {}
             )
             
+            # Get current user or create default user
+            if request.user.is_authenticated:
+                uploaded_by = request.user
+            else:
+                from django.contrib.auth.models import User
+                uploaded_by, created = User.objects.get_or_create(
+                    username='anonymous',
+                    defaults={
+                        'email': 'anonymous@example.com',
+                        'first_name': 'Anonymous',
+                        'last_name': 'User'
+                    }
+                )
+            
             # Create Document record
             document = Document.objects.create(
                 name=uploaded_file.name,
                 file=file_path,
                 template=template,
+                uploaded_by=uploaded_by,
                 extracted_data={
                     'fields': [
                         {

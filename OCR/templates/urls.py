@@ -16,4 +16,9 @@ urlpatterns = [
     path('<int:template_id>/save-structure/', views.save_template_structure, name='save_template_structure'),
     path('<int:template_id>/reprocess/', views.reprocess_template, name='reprocess_template'),
     path('<int:template_id>/fields/', views.template_fields_api, name='template_fields_api'),
+    # Alternative actions to deletion
+    path('<int:template_id>/deactivate/', views.template_deactivate, name='template_deactivate'),
+    path('<int:template_id>/archive/', views.template_archive, name='template_archive'),
+    path('<int:template_id>/duplicate/', views.template_duplicate, name='template_duplicate'),
+    path('<int:template_id>/export/', views.template_export, name='template_export'),
 ]

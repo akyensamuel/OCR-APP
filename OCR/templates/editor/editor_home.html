@@ -1,0 +1,325 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Text Editor - OCR App{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 3rem 0;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .recent-document {
+        border-left: 3px solid #0d6efd;
+        transition: all 0.2s;
+    }
+    
+    .recent-document:hover {
+        background: #f8f9fa;
+        border-left-color: #0dcaf0;
+    }
+    
+    .feature-icon {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        font-size: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Hero Section -->
+    <div class="hero-section text-center">
+        <h1 class="display-4 mb-3">
+            <i class="fas fa-edit"></i> Text Document Editor
+        </h1>
+        <p class="lead mb-4">
+            Extract, edit, and manage text from images and documents using advanced OCR technology
+        </p>
+        <div class="d-flex justify-content-center gap-3">
+            <a href="{% url 'editor:upload_text_document' %}" class="btn btn-light btn-lg">
+                <i class="fas fa-upload"></i> Upload New Document
+            </a>
+            <a href="{% url 'editor:text_document_list' %}" class="btn btn-outline-light btn-lg">
+                <i class="fas fa-list"></i> View All Documents
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card border-primary h-100">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-primary text-white mx-auto mb-3">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <h3 class="mb-0">{{ total_documents }}</h3>
+                    <p class="text-muted mb-0">Total Documents</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-success h-100">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-success text-white mx-auto mb-3">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3 class="mb-0">{{ total_documents }}</h3>
+                    <p class="text-muted mb-0">Processed</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-info h-100">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-info text-white mx-auto mb-3">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3 class="mb-0">{{ recent_documents|length }}</h3>
+                    <p class="text-muted mb-0">Recent</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-warning h-100">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-warning text-white mx-auto mb-3">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <h3 class="mb-0">OCR</h3>
+                    <p class="text-muted mb-0">Powered</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Documents -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history text-primary"></i> Recent Documents
+                    </h5>
+                    <a href="{% url 'editor:text_document_list' %}" class="btn btn-sm btn-outline-primary">
+                        View All <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if recent_documents %}
+                        <div class="list-group list-group-flush">
+                            {% for document in recent_documents %}
+                            <div class="list-group-item recent-document">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            <i class="fas fa-file-alt text-primary"></i>
+                                            {{ document.title }}
+                                        </h6>
+                                        <div class="d-flex gap-3 text-muted small">
+                                            <span>
+                                                <i class="fas fa-calendar"></i>
+                                                {{ document.created_at|date:"M d, Y" }}
+                                            </span>
+                                            <span>
+                                                <i class="fas fa-chart-line"></i>
+                                                {{ document.confidence_score|floatformat:1 }}% confidence
+                                            </span>
+                                            <span>
+                                                <i class="fas fa-font"></i>
+                                                {{ document.word_count }} words
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <a href="{% url 'editor:edit_text_document' document.id %}" 
+                                           class="btn btn-sm btn-primary">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </a>
+                                        <a href="{% url 'editor:export_text_document' document.id %}" 
+                                           class="btn btn-sm btn-success">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No documents yet. Upload your first document to get started!</p>
+                            <a href="{% url 'editor:upload_text_document' %}" class="btn btn-primary">
+                                <i class="fas fa-upload"></i> Upload Document
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Features & Quick Actions -->
+        <div class="col-lg-4">
+            <!-- Quick Actions -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt text-warning"></i> Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'editor:upload_text_document' %}" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Upload New Document
+                        </a>
+                        <a href="{% url 'editor:text_document_list' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-list"></i> View All Documents
+                        </a>
+                        <a href="{% url 'templates:template_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-th-large"></i> Manage Templates
+                        </a>
+                        <a href="{% url 'documents:document_list' %}" class="btn btn-outline-info">
+                            <i class="fas fa-folder-open"></i> Process Documents
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-magic text-info"></i> Features
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-3">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Advanced OCR</strong>
+                            <br>
+                            <small class="text-muted">Extract text from images with high accuracy</small>
+                        </li>
+                        <li class="mb-3">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Real-time Editing</strong>
+                            <br>
+                            <small class="text-muted">Edit extracted text with live preview</small>
+                        </li>
+                        <li class="mb-3">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Multiple Formats</strong>
+                            <br>
+                            <small class="text-muted">Support for JPG, PNG, PDF, TIFF, and more</small>
+                        </li>
+                        <li class="mb-3">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Export Options</strong>
+                            <br>
+                            <small class="text-muted">Download as text, Word, or PDF</small>
+                        </li>
+                        <li class="mb-0">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Confidence Scores</strong>
+                            <br>
+                            <small class="text-muted">View accuracy metrics for each extraction</small>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">
+                <i class="fas fa-question-circle text-info"></i> How It Works
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-3">
+                    <div class="p-3">
+                        <div class="feature-icon bg-primary text-white mx-auto mb-3">
+                            <i class="fas fa-upload"></i>
+                        </div>
+                        <h5>1. Upload</h5>
+                        <p class="text-muted small">
+                            Upload your document or image file
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3">
+                        <div class="feature-icon bg-success text-white mx-auto mb-3">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <h5>2. Process</h5>
+                        <p class="text-muted small">
+                            AI-powered OCR extracts the text
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3">
+                        <div class="feature-icon bg-info text-white mx-auto mb-3">
+                            <i class="fas fa-edit"></i>
+                        </div>
+                        <h5>3. Edit</h5>
+                        <p class="text-muted small">
+                            Review and edit the extracted text
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3">
+                        <div class="feature-icon bg-warning text-white mx-auto mb-3">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <h5>4. Export</h5>
+                        <p class="text-muted small">
+                            Download in your preferred format
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Show any messages
+    {% if messages %}
+        {% for message in messages %}
+            {% if message.tags == 'success' %}
+                showSuccessToast('{{ message }}');
+            {% elif message.tags == 'error' %}
+                showErrorToast('{{ message }}');
+            {% else %}
+                showInfoToast('{{ message }}');
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+</script>
+{% endblock %}

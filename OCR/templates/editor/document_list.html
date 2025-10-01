@@ -1,0 +1,528 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Text Documents - OCR Editor{% endblock %}
+
+{% block extra_css %}
+<style>
+    .document-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: 1px solid #dee2e6;
+        height: 100%;
+    }
+    
+    .document-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .document-thumbnail {
+        height: 150px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 3rem;
+    }
+    
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .document-stats {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .document-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    
+    .empty-state i {
+        font-size: 5rem;
+        color: #dee2e6;
+        margin-bottom: 1rem;
+    }
+    
+    .filter-section {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .search-box {
+        max-width: 500px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2 class="mb-1">
+                <i class="fas fa-file-alt"></i> Text Documents
+            </h2>
+            <p class="text-muted">Manage and edit your OCR-processed documents</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'editor:upload_text_document' %}" class="btn btn-primary">
+                <i class="fas fa-upload"></i> Upload New Document
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">Total Documents</h6>
+                            <h2 class="mb-0">{{ documents.count }}</h2>
+                        </div>
+                        <i class="fas fa-file-alt fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">Completed</h6>
+                            <h2 class="mb-0">{{ documents|length }}</h2>
+                        </div>
+                        <i class="fas fa-check-circle fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">Processing</h6>
+                            <h2 class="mb-0">0</h2>
+                        </div>
+                        <i class="fas fa-spinner fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">Recent</h6>
+                            <h2 class="mb-0">{{ documents|slice:":7"|length }}</h2>
+                        </div>
+                        <i class="fas fa-clock fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter and Search Section -->
+    <div class="filter-section">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="input-group search-box">
+                    <span class="input-group-text">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" class="form-control" id="searchInput" 
+                           placeholder="Search documents by title...">
+                </div>
+            </div>
+            <div class="col-md-6 text-end">
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-secondary active" data-view="grid">
+                        <i class="fas fa-th"></i> Grid
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" data-view="list">
+                        <i class="fas fa-list"></i> List
+                    </button>
+                </div>
+                <select class="form-select d-inline-block w-auto ms-2" id="sortSelect">
+                    <option value="date-desc">Newest First</option>
+                    <option value="date-asc">Oldest First</option>
+                    <option value="title-asc">Title A-Z</option>
+                    <option value="title-desc">Title Z-A</option>
+                    <option value="confidence-desc">Highest Confidence</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Grid -->
+    {% if documents %}
+    <div class="row g-4" id="documentsContainer">
+        {% for document in documents %}
+        <div class="col-md-4 col-lg-3 document-item" 
+             data-title="{{ document.title|lower }}"
+             data-date="{{ document.created_at|date:'Y-m-d' }}"
+             data-confidence="{{ document.confidence_score }}">
+            <div class="card document-card">
+                <div class="document-thumbnail">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title mb-0" style="font-size: 1rem;">
+                            {{ document.title|truncatechars:30 }}
+                        </h5>
+                        <span class="badge 
+                            {% if document.processing_status == 'completed' %}bg-success
+                            {% elif document.processing_status == 'processing' %}bg-info
+                            {% elif document.processing_status == 'failed' %}bg-danger
+                            {% else %}bg-secondary{% endif %} status-badge">
+                            {{ document.get_processing_status_display }}
+                        </span>
+                    </div>
+                    
+                    <div class="document-stats mb-3">
+                        <div class="mb-1">
+                            <i class="fas fa-chart-line text-primary"></i>
+                            <strong>Confidence:</strong> {{ document.confidence_score|floatformat:1 }}%
+                        </div>
+                        <div class="mb-1">
+                            <i class="fas fa-font"></i>
+                            <strong>Words:</strong> {{ document.word_count }}
+                        </div>
+                        <div class="mb-1">
+                            <i class="fas fa-calendar"></i>
+                            <strong>Created:</strong> {{ document.created_at|date:"M d, Y" }}
+                        </div>
+                    </div>
+                    
+                    <div class="document-actions">
+                        <a href="{% url 'editor:edit_text_document' document.id %}" 
+                           class="btn btn-sm btn-primary flex-fill">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <button type="button" class="btn btn-sm btn-info" 
+                                onclick="previewDocument({{ document.id }})">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <a href="{% url 'editor:export_text_document' document.id %}" 
+                           class="btn btn-sm btn-success">
+                            <i class="fas fa-download"></i>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-danger" 
+                                onclick="confirmDelete({{ document.id }}, '{{ document.title|escapejs }}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination (if needed) -->
+    {% if documents.count > 20 %}
+    <nav aria-label="Document pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            <li class="page-item disabled">
+                <a class="page-link" href="#" tabindex="-1">Previous</a>
+            </li>
+            <li class="page-item active"><a class="page-link" href="#">1</a></li>
+            <li class="page-item"><a class="page-link" href="#">2</a></li>
+            <li class="page-item"><a class="page-link" href="#">3</a></li>
+            <li class="page-item">
+                <a class="page-link" href="#">Next</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+    
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-state">
+        <i class="fas fa-file-alt"></i>
+        <h3>No Documents Yet</h3>
+        <p class="text-muted mb-4">
+            Upload your first document to start extracting and editing text with OCR technology.
+        </p>
+        <a href="{% url 'editor:upload_text_document' %}" class="btn btn-primary btn-lg">
+            <i class="fas fa-upload"></i> Upload Your First Document
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Document Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent" style="max-height: 500px; overflow-y: auto;">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Delete
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this document?</p>
+                <p class="mb-0"><strong id="deleteDocumentTitle"></strong></p>
+                <p class="text-danger mt-2">
+                    <small><i class="fas fa-exclamation-circle"></i> This action cannot be undone.</small>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete Document
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        const documentItems = document.querySelectorAll('.document-item');
+        
+        documentItems.forEach(item => {
+            const title = item.dataset.title;
+            if (title.includes(searchTerm)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
+    // Sort functionality
+    document.getElementById('sortSelect').addEventListener('change', function(e) {
+        const sortBy = e.target.value;
+        const container = document.getElementById('documentsContainer');
+        const items = Array.from(document.querySelectorAll('.document-item'));
+        
+        items.sort((a, b) => {
+            switch(sortBy) {
+                case 'date-desc':
+                    return new Date(b.dataset.date) - new Date(a.dataset.date);
+                case 'date-asc':
+                    return new Date(a.dataset.date) - new Date(b.dataset.date);
+                case 'title-asc':
+                    return a.dataset.title.localeCompare(b.dataset.title);
+                case 'title-desc':
+                    return b.dataset.title.localeCompare(a.dataset.title);
+                case 'confidence-desc':
+                    return parseFloat(b.dataset.confidence) - parseFloat(a.dataset.confidence);
+                default:
+                    return 0;
+            }
+        });
+        
+        items.forEach(item => container.appendChild(item));
+    });
+
+    // View toggle (grid/list)
+    document.querySelectorAll('[data-view]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            const container = document.getElementById('documentsContainer');
+            if (this.dataset.view === 'list') {
+                container.classList.remove('row', 'g-4');
+                container.classList.add('list-group');
+                document.querySelectorAll('.document-item').forEach(item => {
+                    item.className = 'document-item list-group-item';
+                });
+            } else {
+                container.classList.add('row', 'g-4');
+                container.classList.remove('list-group');
+                document.querySelectorAll('.document-item').forEach(item => {
+                    item.className = 'col-md-4 col-lg-3 document-item';
+                });
+            }
+        });
+    });
+
+    // Preview document
+    function previewDocument(documentId) {
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        const previewContent = document.getElementById('previewContent');
+        
+        // Show loading
+        previewContent.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        `;
+        
+        modal.show();
+        
+        // Fetch document content
+        fetch(`/editor/api/document/${documentId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let imagePreview = '';
+                    if (data.document.original_file) {
+                        const imageUrl = data.document.original_file.startsWith('/') ? data.document.original_file : '/media/' + data.document.original_file;
+                        imagePreview = `
+                            <div class="mb-3">
+                                <h6><i class="fas fa-image me-2"></i>Original Document</h6>
+                                <div class="text-center">
+                                    <img src="${imageUrl}" 
+                                         alt="Document Preview" 
+                                         class="img-fluid border rounded shadow-sm" 
+                                         style="max-height: 300px; cursor: pointer;"
+                                         onclick="openImageZoom('${imageUrl}')"
+                                         onerror="this.parentElement.parentElement.style.display='none'">
+                                    <p class="text-muted mt-2"><small>Click image to enlarge</small></p>
+                                </div>
+                            </div>
+                            <hr>
+                        `;
+                    }
+                    
+                    previewContent.innerHTML = `
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">${data.document.title}</h6>
+                                <small class="text-muted">
+                                    <i class="fas fa-chart-line"></i> Confidence: ${data.document.confidence_score}% | 
+                                    <i class="fas fa-font"></i> ${data.document.word_count} words
+                                </small>
+                            </div>
+                            <div class="card-body">
+                                ${imagePreview}
+                                <h6><i class="fas fa-file-alt me-2"></i>Extracted Text</h6>
+                                <pre style="white-space: pre-wrap; font-family: inherit; background: #f8f9fa; padding: 1rem; border-radius: 0.5rem;">${data.document.extracted_text || 'No text extracted'}</pre>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    showErrorToast('Failed to load document preview');
+                    previewContent.innerHTML = '<p class="text-danger">Failed to load preview</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showErrorToast('Error loading document preview');
+                previewContent.innerHTML = '<p class="text-danger">Error loading preview</p>';
+            });
+    }
+
+    // Open image zoom modal
+    function openImageZoom(imageUrl) {
+        // Create or get zoom modal
+        let zoomModal = document.getElementById('imageZoomModal');
+        
+        if (!zoomModal) {
+            // Create zoom modal if it doesn't exist
+            const modalHTML = `
+                <div class="modal fade" id="imageZoomModal" tabindex="-1">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-search-plus me-2"></i>Document Image
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body text-center p-0" style="background: #000;">
+                                <img id="zoomModalImage" src="" class="img-fluid" style="max-height: 85vh; width: auto;">
+                            </div>
+                            <div class="modal-footer">
+                                <a id="downloadImageBtn" href="" download class="btn btn-success">
+                                    <i class="fas fa-download me-2"></i>Download Image
+                                </a>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            zoomModal = document.getElementById('imageZoomModal');
+        }
+        
+        // Update image source
+        const zoomImage = document.getElementById('zoomModalImage');
+        const downloadBtn = document.getElementById('downloadImageBtn');
+        
+        zoomImage.src = imageUrl;
+        downloadBtn.href = imageUrl;
+        
+        // Show modal
+        const modal = new bootstrap.Modal(zoomModal);
+        modal.show();
+    }
+
+    // Delete confirmation
+    function confirmDelete(documentId, documentTitle) {
+        const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        document.getElementById('deleteDocumentTitle').textContent = documentTitle;
+        document.getElementById('deleteForm').action = `/editor/delete/${documentId}/`;
+        modal.show();
+    }
+
+    // Show success message if redirected after action
+    {% if messages %}
+        {% for message in messages %}
+            {% if message.tags == 'success' %}
+                showSuccessToast('{{ message }}');
+            {% elif message.tags == 'error' %}
+                showErrorToast('{{ message }}');
+            {% else %}
+                showInfoToast('{{ message }}');
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+</script>
+{% endblock %}

@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         
         if (!documentFile.files[0]) {
-            alert('Please select a document file');
+            showErrorToast('Please select a document file');
             return;
         }
         
