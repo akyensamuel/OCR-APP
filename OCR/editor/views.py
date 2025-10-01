@@ -158,3 +158,54 @@ def document_api_detail(request, document_id):
             'success': False,
             'error': str(e)
         }, status=400)
+
+
+def reprocess_text_document(request, document_id):
+    """Reprocess a text document with OCR"""
+    document = get_object_or_404(TextDocument, id=document_id)
+    
+    if request.method == 'POST':
+        try:
+            # Check if original file exists
+            if not document.original_file:
+                messages.error(request, 'No original file available for reprocessing')
+                return redirect('editor:document_list')
+            
+            # Get full file path
+            full_path = os.path.join(settings.MEDIA_ROOT, document.original_file.name)
+            
+            if not os.path.exists(full_path):
+                messages.error(request, 'Original file not found')
+                return redirect('editor:document_list')
+            
+            # Reprocess with OCR
+            document.processing_status = 'processing'
+            document.save()
+            
+            ocr_engine = OCREngine()
+            ocr_result = ocr_engine.extract_text(full_path)
+            
+            # Update document
+            document.extracted_text = ocr_result.text
+            document.confidence_score = ocr_result.confidence
+            document.processing_status = 'completed'
+            document.save()
+            
+            messages.success(
+                request, 
+                f'Document reprocessed successfully! Confidence: {ocr_result.confidence:.1f}%'
+            )
+            return redirect('editor:edit_text_document', document_id=document.id)
+            
+        except Exception as e:
+            document.processing_status = 'failed'
+            document.save()
+            messages.error(request, f'Error reprocessing document: {str(e)}')
+            return redirect('editor:document_list')
+    
+    # GET request - show confirmation page
+    context = {
+        'document': document,
+    }
+    return render(request, 'editor/reprocess_confirm.html', context)
+

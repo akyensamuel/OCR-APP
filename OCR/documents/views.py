@@ -306,3 +306,102 @@ def document_export(request, document_id):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
     return response
+
+
+def document_reextract_field(request, document_id):
+    """Re-extract a specific field from the document using OCR"""
+    import json
+    
+    if request.method == 'POST':
+        try:
+            from ocr_processing.ocr_core import OCREngine, TemplateProcessor
+            from django.conf import settings
+            import os
+            
+            document = get_object_or_404(Document, id=document_id)
+            
+            # Get field name from request
+            data = json.loads(request.body)
+            field_name = data.get('field_name')
+            
+            if not field_name:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Field name is required'
+                }, status=400)
+            
+            # Check if document has a template
+            if not document.template:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'This document has no associated template'
+                }, status=400)
+            
+            # Get document file path
+            full_path = os.path.join(settings.MEDIA_ROOT, document.file.name)
+            
+            if not os.path.exists(full_path):
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Original document file not found'
+                }, status=404)
+            
+            # Re-extract the field
+            ocr_engine = OCREngine()
+            template_processor = TemplateProcessor(ocr_engine)
+            
+            # Extract all fields again using the template
+            extracted_fields = template_processor.process_document_with_template(
+                full_path,
+                document.template.structure
+            )
+            
+            # Find the specific field
+            field_value = None
+            field_confidence = None
+            
+            for field in extracted_fields:
+                if field.name == field_name:
+                    field_value = field.value
+                    field_confidence = field.confidence
+                    break
+            
+            if field_value is None:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Field "{field_name}" not found in extraction result'
+                }, status=404)
+            
+            # Update the document's extracted data for this field
+            if document.extracted_data and 'fields' in document.extracted_data:
+                for i, field in enumerate(document.extracted_data['fields']):
+                    if field.get('name') == field_name:
+                        document.extracted_data['fields'][i]['value'] = field_value
+                        document.extracted_data['fields'][i]['confidence'] = field_confidence
+                        break
+                
+                document.save()
+            
+            return JsonResponse({
+                'status': 'success',
+                'field_name': field_name,
+                'field_value': field_value,
+                'confidence': field_confidence,
+                'message': f'Field "{field_name}" re-extracted successfully'
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid JSON data'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Error re-extracting field: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({
+        'status': 'error',
+        'message': 'Invalid request method'
+    }, status=405)

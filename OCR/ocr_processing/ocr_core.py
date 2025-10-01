@@ -215,22 +215,29 @@ class OCREngine:
             # Try to process PDF if pdf2image is available
             try:
                 from pdf2image import convert_from_path
+                import tempfile
+                import os
                 
                 # Convert PDF to images
                 images = convert_from_path(pdf_path, first_page=1, last_page=1)  # Process first page only
                 if not images:
                     raise ValueError("No images extracted from PDF")
                 
-                # Convert PIL image to numpy array
-                import tempfile
-                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                    images[0].save(tmp.name, 'PNG')
+                # Create temp file path (but don't use context manager to avoid locking)
+                tmp_fd, tmp_path = tempfile.mkstemp(suffix='.png')
+                
+                try:
+                    # Close the file descriptor immediately to avoid locks
+                    os.close(tmp_fd)
+                    
+                    # Save PIL image to temp file
+                    images[0].save(tmp_path, 'PNG')
                     
                     # Process the image with OCR
                     if preprocess:
-                        image = ImagePreprocessor.preprocess_image(tmp.name)
+                        image = ImagePreprocessor.preprocess_image(tmp_path)
                     else:
-                        image = cv2.imread(tmp.name, cv2.IMREAD_GRAYSCALE)
+                        image = cv2.imread(tmp_path, cv2.IMREAD_GRAYSCALE)
                     
                     # Extract text using available engine
                     if self.preferred_engine == "tesseract" and self.tesseract_available:
@@ -244,15 +251,21 @@ class OCREngine:
                     else:
                         return OCRResult(text="", confidence=0.0, engine="no_engine")
                     
-                    # Clean up temp file
-                    import os
-                    os.unlink(tmp.name)
-                    
                     return OCRResult(
                         text=result.text,
                         confidence=result.confidence,
                         engine=f"pdf_{result.engine}"
                     )
+                    
+                finally:
+                    # Clean up temp file - use try/except for Windows file locking issues
+                    try:
+                        if os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+                    except (OSError, PermissionError) as e:
+                        # Log but don't fail if we can't delete temp file
+                        logger.warning(f"Could not delete temp file {tmp_path}: {e}")
+                        # Temp files will be cleaned up by system eventually
                     
             except ImportError:
                 # pdf2image not available, return informative message

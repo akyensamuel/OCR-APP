@@ -371,8 +371,44 @@ function resetText() {
 
 function reextractField(button, fieldName) {
     if (confirm(`Re-extract the "${fieldName}" field from the original document?`)) {
-        // Implement field re-extraction
-        showInfoToast('Field re-extraction will be implemented in the next update.');
+        const originalText = button.querySelector('.btn-text') ? button.querySelector('.btn-text').textContent : button.textContent;
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Re-extracting...';
+        
+        fetch(`/documents/{{ document.id }}/reextract-field/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                field_name: fieldName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            button.disabled = false;
+            button.textContent = originalText;
+            
+            if (data.status === 'success') {
+                // Update the field input with new value
+                const fieldInput = document.querySelector(`input[name="field_${fieldName}"]`);
+                if (fieldInput) {
+                    fieldInput.value = data.field_value;
+                    fieldInput.setAttribute('data-original', data.field_value);
+                    fieldInput.classList.remove('border-warning');
+                }
+                
+                showSuccessToast(`Field "${fieldName}" re-extracted successfully! Confidence: ${data.confidence.toFixed(1)}%`);
+            } else {
+                showErrorToast(data.message || 'Failed to re-extract field');
+            }
+        })
+        .catch(error => {
+            button.disabled = false;
+            button.textContent = originalText;
+            showErrorToast('Error re-extracting field: ' + error.message);
+        });
     }
 }
 

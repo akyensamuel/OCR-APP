@@ -94,6 +94,7 @@
                                 data-template-status="{{ template.processing_status }}"
                                 data-template-created="{{ template.created_at|date:'M d, Y' }}"
                                 data-template-active="{{ template.is_active|yesno:'true,false' }}"
+                                data-template-file="{{ template.file.url }}"
                                 onclick="showTemplatePreview(this)">
                             <i class="fas fa-eye"></i>
                             View
@@ -419,6 +420,7 @@ function showTemplatePreview(buttonElement) {
     const templateStatus = buttonElement.dataset.templateStatus;
     const templateCreated = buttonElement.dataset.templateCreated;
     const templateActive = buttonElement.dataset.templateActive === 'true';
+    const templateFileUrl = buttonElement.dataset.templateFile;
     
     // Update modal content
     safeSetContent('modalTemplateName', templateName);

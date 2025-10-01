@@ -45,36 +45,64 @@ def template_upload(request):
                 processing_status='pending'
             )
             
-            # Process the template using OCR core
+            # Process the template using advanced table detection
             try:
-                from ocr_processing.ocr_core import OCREngine, TemplateProcessor
+                from ocr_processing.ocr_core import OCREngine
+                from ocr_processing.table_detector import TableDetector
                 import os
                 from django.conf import settings
                 
                 # Get full file path
                 file_path = os.path.join(settings.MEDIA_ROOT, template.file.name)
                 
-                # Initialize OCR engine and template processor
+                # Initialize OCR engine
                 ocr_engine = OCREngine()
-                template_processor = TemplateProcessor(ocr_engine)
                 
                 # Check if OCR engines are available
                 if not ocr_engine.tesseract_available and ocr_engine.easyocr_reader is None:
-                    # No OCR engines available, create a mock structure based on filename
+                    # No OCR engines available, create a mock structure
                     structure_data = {
                         'fields': [
                             {'name': 'Field 1', 'type': 'text', 'required': True},
                             {'name': 'Field 2', 'type': 'text', 'required': True},
-                            {'name': 'Field 3', 'type': 'text', 'required': False}
+                            {'name': 'Field 3', 'type': 'text', 'required': True}
                         ],
                         'total_fields': 3,
                         'extraction_confidence': 50.0,
                         'ocr_engine': 'mock_fallback',
-                        'note': 'OCR engines not available. Install Tesseract or fix EasyOCR for actual field detection.'
+                        'detection_method': 'fallback',
+                        'note': 'OCR engines not available. Install Tesseract for actual table detection.'
                     }
                 else:
-                    # Extract template structure using available OCR
-                    structure_data = template_processor.extract_structure_from_template(file_path)
+                    # Try advanced table detection first
+                    table_detector = TableDetector(ocr_engine)
+                    table_structure = table_detector.detect_table_structure(
+                        file_path, 
+                        method="morphology"  # Can also use "hough"
+                    )
+                    
+                    if table_structure and len(table_structure.headers) > 0:
+                        # Successfully detected table structure
+                        structure_data = table_detector.structure_to_dict(table_structure)
+                        structure_data['detection_method'] = 'table_detection'
+                        structure_data['note'] = f'Detected {table_structure.rows}x{table_structure.cols} table with {len(table_structure.headers)} headers'
+                        
+                        # Also export as Excel template for download
+                        excel_path = file_path.replace(os.path.splitext(file_path)[1], '_template.xlsx')
+                        table_detector.export_to_excel_template(table_structure, excel_path)
+                        
+                        # Save visualization
+                        viz_path = file_path.replace(os.path.splitext(file_path)[1], '_detected.jpg')
+                        from ocr_processing.table_detector import visualize_table_detection
+                        visualize_table_detection(file_path, table_structure, viz_path)
+                        
+                    else:
+                        # Fallback to simple field extraction
+                        from ocr_processing.ocr_core import TemplateProcessor
+                        template_processor = TemplateProcessor(ocr_engine)
+                        structure_data = template_processor.extract_structure_from_template(file_path)
+                        structure_data['detection_method'] = 'simple_extraction'
+                        structure_data['note'] = 'No clear table structure detected. Using simple field extraction.'
                 
                 # Update template with extracted structure
                 template.structure = structure_data

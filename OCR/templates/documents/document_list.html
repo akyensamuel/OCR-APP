@@ -1,0 +1,81 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Documents - OCR App{% endblock %}
+
+{% block extra_css %}
+<style>
+    .document-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        height: 100%;
+    }
+    
+    .document-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .document-thumbnail {
+        height: 150px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 3rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-folder-open"></i> Documents</h2>
+            <p class="text-muted">Manage your processed documents</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'documents:document_upload' %}" class="btn btn-primary">
+                <i class="fas fa-upload"></i> Upload New Document
+            </a>
+        </div>
+    </div>
+
+    {% if documents %}
+    <div class="row g-4">
+        {% for document in documents %}
+        <div class="col-md-4 col-lg-3">
+            <div class="card document-card">
+                <div class="document-thumbnail">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ document.name|truncatechars:30 }}</h5>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            {{ document.created_at|date:"M d, Y" }}
+                        </small>
+                    </p>
+                    <a href="{% url 'documents:document_detail' document.id %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-eye"></i> View
+                    </a>
+                    <a href="{% url 'documents:document_edit' document.id %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-edit"></i> Edit
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-inbox fa-4x text-muted mb-4"></i>
+        <h4 class="text-muted">No Documents Yet</h4>
+        <p class="text-muted mb-4">Upload your first document to get started.</p>
+        <a href="{% url 'documents:document_upload' %}" class="btn btn-primary btn-lg">
+            <i class="fas fa-upload"></i> Upload Document
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

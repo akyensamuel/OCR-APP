@@ -48,15 +48,46 @@ class Template(models.Model):
     @property
     def field_count(self):
         """Return the number of fields detected in this template"""
-        if self.structure and 'fields' in self.structure:
+        if not self.structure:
+            return 0
+        
+        # New table detection format (has 'headers' or 'field_names')
+        if 'headers' in self.structure:
+            headers = self.structure['headers']
+            if isinstance(headers, (list, dict)):
+                return len(headers)
+        
+        if 'field_names' in self.structure:
+            return len(self.structure['field_names'])
+        
+        # Old format (has 'fields' key)
+        if 'fields' in self.structure:
             fields = self.structure['fields']
             if isinstance(fields, (list, dict)):
                 return len(fields)
+        
         return 0
     
     def get_field_names(self):
         """Return list of field names from the template structure"""
-        if self.structure and 'fields' in self.structure:
+        if not self.structure:
+            return []
+        
+        # New table detection format (has 'headers' key)
+        if 'headers' in self.structure:
+            headers = self.structure['headers']
+            if isinstance(headers, dict):
+                # Headers are stored as {col_index: header_name}
+                return list(headers.values())
+            elif isinstance(headers, list):
+                return headers
+        
+        # New table detection format (has 'field_names' key)
+        if 'field_names' in self.structure:
+            return self.structure['field_names']
+        
+        # Old format (has 'fields' key)
+        if 'fields' in self.structure:
             fields = self.structure['fields']
             if isinstance(fields, list):
                 # If fields is a list of field objects
@@ -64,4 +95,5 @@ class Template(models.Model):
             elif isinstance(fields, dict):
                 # If fields is a dictionary
                 return list(fields.keys())
+        
         return []

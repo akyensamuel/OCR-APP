@@ -13,7 +13,6 @@
 ## 🔧 Required Applications
 
 ### 1. **Tesseract OCR Engine** ⭐ CRITICAL
-### 2. **Poppler package** VERY NECESSARY FOR PDF OPERATIONS
 Tesseract is the primary OCR engine used for text extraction from images and documents.
 
 #### Windows Installation:
@@ -70,7 +69,61 @@ export TESSERACT_PATH="/usr/bin/tesseract"
 
 ---
 
-### 2. **Python 3.8+** ⭐ REQUIRED
+### 2. **Poppler** ⭐ CRITICAL FOR PDF PROCESSING
+Poppler is required for PDF to image conversion, used by the `pdf2image` library.
+
+#### Windows Installation:
+1. **Download Poppler:**
+   - Go to: https://github.com/oschwartz10612/poppler-windows/releases/
+   - Download the latest release (e.g., `Release-24.08.0-0.zip`)
+
+2. **Extract and Install:**
+   - Extract the ZIP file to a location like `C:\Program Files\poppler-24.08.0\`
+   - Note the path to the `bin` folder: `C:\Program Files\poppler-24.08.0\Library\bin`
+
+3. **Add to PATH:**
+   - Open System Environment Variables:
+     - Press `Win + X` → System → Advanced system settings
+     - Click "Environment Variables"
+     - Under "System variables", find "Path"
+     - Click "Edit" → "New"
+     - Add: `C:\Program Files\poppler-24.08.0\Library\bin`
+     - Click "OK" to save
+
+4. **Verify Installation:**
+   ```cmd
+   # Close and reopen Command Prompt
+   pdfinfo -v
+   ```
+   Expected output: `pdfinfo version X.XX.X`
+
+#### Ubuntu/Debian Installation:
+```bash
+sudo apt-get update
+sudo apt-get install poppler-utils
+```
+
+#### macOS Installation:
+```bash
+brew install poppler
+```
+
+#### Manual Configuration (if not in PATH):
+If you don't want to add Poppler to PATH, you can specify the path in Python:
+
+```python
+from pdf2image import convert_from_path
+
+# Specify poppler path (Windows)
+images = convert_from_path(
+    pdf_path,
+    poppler_path=r'C:\Program Files\poppler-24.08.0\Library\bin'
+)
+```
+
+---
+
+### 3. **Python 3.8+** ⭐ REQUIRED
 The application requires Python 3.8 or higher.
 
 #### Check Python Version:
@@ -94,6 +147,7 @@ All Python dependencies are listed in `requirements.txt`:
 ### Core Dependencies:
 - **Django 5.2.6** - Web framework
 - **pytesseract 0.3.13** - Python wrapper for Tesseract
+- **pdf2image 1.17.0** - PDF to image conversion (requires Poppler)
 - **easyocr 1.7.2** - Alternative OCR engine (deep learning-based)
 - **opencv-python-headless 4.12.0** - Image processing
 - **Pillow 11.3.0** - Image handling
@@ -248,7 +302,31 @@ Edit `OCR/OCR/settings.py` for:
    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
    ```
 
-### Issue 2: "EasyOCR initialization failed"
+### Issue 2: "Unable to get page count. Is poppler installed and in PATH?"
+**Solution:**
+1. Verify Poppler is installed:
+   ```cmd
+   pdfinfo -v
+   # or
+   pdftoppm -v
+   ```
+2. Add Poppler to PATH (see Poppler installation section above)
+3. Or specify poppler_path in code:
+   ```python
+   # In ocr_processing/utils.py, modify convert_from_path calls:
+   from pdf2image import convert_from_path
+   images = convert_from_path(
+       pdf_path,
+       poppler_path=r'C:\Program Files\poppler-24.08.0\Library\bin'
+   )
+   ```
+4. **Quick Fix for Windows:**
+   - Download: https://github.com/oschwartz10612/poppler-windows/releases/
+   - Extract to `C:\Program Files\poppler-24.08.0\`
+   - Add `C:\Program Files\poppler-24.08.0\Library\bin` to System PATH
+   - **Restart your terminal/IDE** for PATH changes to take effect
+
+### Issue 3: "EasyOCR initialization failed"
 **Solution:**
 - This is non-critical; application will fall back to Tesseract
 - For full EasyOCR support:
@@ -256,13 +334,20 @@ Edit `OCR/OCR/settings.py` for:
   pip install torch torchvision easyocr --upgrade
   ```
 
-### Issue 3: "No module named 'cv2'"
+### Issue 4: "No module named 'cv2'"
 **Solution:**
 ```bash
 pip install opencv-python-headless
 ```
 
-### Issue 4: "Template upload shows 0 fields"
+### Issue 5: "No module named 'pdf2image'"
+**Solution:**
+```bash
+pip install pdf2image
+```
+Then install Poppler (see Issue 2 above).
+
+### Issue 6: "Template upload shows 0 fields"
 **Possible Causes:**
 1. Tesseract not installed → Install Tesseract
 2. OCR engines not available → Check installation
@@ -270,14 +355,14 @@ pip install opencv-python-headless
 
 **Fallback:** The application will create a mock 3-field structure if OCR engines are unavailable.
 
-### Issue 5: PyTorch Installation Issues (Windows)
+### Issue 7: PyTorch Installation Issues (Windows)
 **Solution:**
 ```bash
 # Install specific PyTorch version
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 ```
 
-### Issue 6: Permission Issues (Linux/Mac)
+### Issue 8: Permission Issues (Linux/Mac)
 **Solution:**
 ```bash
 # Fix media directory permissions
@@ -293,6 +378,17 @@ chmod -R 755 static/
 ```bash
 tesseract --version
 tesseract --list-langs
+```
+
+### Verify Poppler Installation:
+```bash
+# Windows
+pdfinfo -v
+pdftoppm -h
+
+# Linux/Mac
+pdfinfo -version
+pdftoppm -version
 ```
 
 ### Verify Python Dependencies:
