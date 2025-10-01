@@ -1,0 +1,438 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Edit {{ document.name }} - Document{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'templates:home' %}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'documents:document_list' %}">Documents</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'documents:document_detail' document.id %}">{{ document.name }}</a></li>
+                <li class="breadcrumb-item active">Edit</li>
+            </ol>
+        </nav>
+        
+        <h2 class="mb-4">
+            <i class="fas fa-edit me-2"></i>
+            Edit Document: {{ document.name }}
+        </h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-9">
+        <form method="post" id="editDocumentForm">
+            {% csrf_token %}
+            
+            <!-- Template-based Document Editing -->
+            {% if document.template and document.extracted_data.fields %}
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Field Data Editor
+                        <span class="badge bg-info ms-2">Template: {{ document.template.name }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Template-based Document:</strong> Edit individual field values extracted from the document.
+                    </div>
+                    
+                    <div class="row">
+                        {% for field in document.extracted_data.fields %}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-tag me-1"></i>
+                                {{ field.name }}
+                                {% if field.confidence %}
+                                <span class="badge bg-{% if field.confidence > 80 %}success{% elif field.confidence > 60 %}warning{% else %}danger{% endif %} ms-2">
+                                    {{ field.confidence|floatformat:1 }}% confidence
+                                </span>
+                                {% endif %}
+                            </label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" 
+                                       name="field_{{ forloop.counter0 }}_value"
+                                       value="{{ field.value }}"
+                                       data-original="{{ field.value }}"
+                                       onchange="markFieldAsEdited(this)">
+                                <button class="btn btn-outline-secondary" type="button" 
+                                        onclick="reextractField(this, '{{ field.name }}')"
+                                        title="Re-extract this field">
+                                    <i class="fas fa-sync"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Original OCR: "{{ field.value }}"
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- General Text Document Editing -->
+            {% else %}
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-align-left me-2"></i>
+                        Text Editor
+                        {% if document.extracted_data.confidence %}
+                        <span class="badge bg-{% if document.extracted_data.confidence > 80 %}success{% elif document.extracted_data.confidence > 60 %}warning{% else %}danger{% endif %} ms-2">
+                            {{ document.extracted_data.confidence|floatformat:1 }}% confidence
+                        </span>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>General Text Document:</strong> Edit the complete extracted text content.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="extractedText" class="form-label">
+                            <i class="fas fa-file-alt me-1"></i>
+                            Extracted Text
+                        </label>
+                        <textarea class="form-control" id="extractedText" name="extracted_text" 
+                                  rows="20" data-original="{{ document.extracted_data.text|default:'' }}"
+                                  onchange="markTextAsEdited(this)">{{ document.extracted_data.text|default:'' }}</textarea>
+                        
+                        <div class="form-text d-flex justify-content-between">
+                            <span>Character count: <span id="charCount">{{ document.extracted_data.text|length|default:0 }}</span></span>
+                            <span>Word count: <span id="wordCount">{{ document.extracted_data.text|wordcount|default:0 }}</span></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Text Editing Tools -->
+                    <div class="border-top pt-3">
+                        <h6>Text Editing Tools</h6>
+                        <div class="btn-group me-2" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatText('uppercase')">
+                                <i class="fas fa-font"></i> UPPERCASE
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatText('lowercase')">
+                                <i class="fas fa-font"></i> lowercase
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatText('title')">
+                                <i class="fas fa-font"></i> Title Case
+                            </button>
+                        </div>
+                        <div class="btn-group me-2" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cleanText()">
+                                <i class="fas fa-broom"></i> Clean Text
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="removeExtraSpaces()">
+                                <i class="fas fa-compress"></i> Remove Extra Spaces
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="resetText()">
+                            <i class="fas fa-undo"></i> Reset to Original
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Action Buttons -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <a href="{% url 'documents:document_detail' document.id %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Cancel
+                            </a>
+                        </div>
+                        
+                        <div>
+                            <button type="button" class="btn btn-outline-info me-2" onclick="previewChanges()">
+                                <i class="fas fa-eye me-2"></i>
+                                Preview Changes
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="col-lg-3">
+        <!-- Document Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Document Info
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Status:</strong><br>
+                    <span class="badge bg-{% if document.processing_status == 'completed' %}success{% elif document.processing_status == 'failed' %}danger{% else %}warning{% endif %}">
+                        {{ document.get_processing_status_display }}
+                    </span>
+                </div>
+                
+                {% if document.template %}
+                <div class="mb-3">
+                    <strong>Template:</strong><br>
+                    <a href="{% url 'templates:template_detail' document.template.id %}" class="text-decoration-none">
+                        {{ document.template.name }}
+                    </a>
+                </div>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <strong>File Size:</strong><br>
+                    <span class="text-muted">{{ document.file.size|filesizeformat }}</span>
+                </div>
+                
+                <div class="mb-3">
+                    <strong>Uploaded:</strong><br>
+                    <span class="text-muted">{{ document.created_at|date:"M d, Y H:i" }}</span>
+                </div>
+                
+                {% if document.extracted_data.manually_edited %}
+                <div class="mb-3">
+                    <strong>Last Edited:</strong><br>
+                    <span class="text-muted">{{ document.extracted_data.last_edited|date:"M d, Y H:i" }}</span>
+                    <br><span class="badge bg-warning">Manually Edited</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>
+                    Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-info" onclick="reprocessDocument()">
+                        <i class="fas fa-sync me-2"></i>
+                        Reprocess Document
+                    </button>
+                    <button class="btn btn-outline-success" onclick="exportDocument()">
+                        <i class="fas fa-download me-2"></i>
+                        Export Text
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="viewOriginal()">
+                        <i class="fas fa-file me-2"></i>
+                        View Original
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye me-2"></i>
+                    Changes Preview
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="confirmSave()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let hasChanges = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Update character and word count for text areas
+    const textarea = document.getElementById('extractedText');
+    if (textarea) {
+        textarea.addEventListener('input', updateTextStats);
+        updateTextStats();
+    }
+    
+    // Warn about unsaved changes
+    window.addEventListener('beforeunload', function(e) {
+        if (hasChanges) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+});
+
+function markFieldAsEdited(input) {
+    const original = input.getAttribute('data-original');
+    if (input.value !== original) {
+        input.classList.add('border-warning');
+        hasChanges = true;
+    } else {
+        input.classList.remove('border-warning');
+    }
+}
+
+function markTextAsEdited(textarea) {
+    const original = textarea.getAttribute('data-original');
+    if (textarea.value !== original) {
+        textarea.classList.add('border-warning');
+        hasChanges = true;
+    } else {
+        textarea.classList.remove('border-warning');
+    }
+    updateTextStats();
+}
+
+function updateTextStats() {
+    const textarea = document.getElementById('extractedText');
+    if (textarea) {
+        const text = textarea.value;
+        document.getElementById('charCount').textContent = text.length;
+        document.getElementById('wordCount').textContent = text.trim() ? text.trim().split(/\\s+/).length : 0;
+    }
+}
+
+function formatText(type) {
+    const textarea = document.getElementById('extractedText');
+    if (textarea) {
+        let text = textarea.value;
+        switch(type) {
+            case 'uppercase':
+                textarea.value = text.toUpperCase();
+                break;
+            case 'lowercase':
+                textarea.value = text.toLowerCase();
+                break;
+            case 'title':
+                textarea.value = text.replace(/\\w\\S*/g, (txt) => 
+                    txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+                break;
+        }
+        markTextAsEdited(textarea);
+    }
+}
+
+function cleanText() {
+    const textarea = document.getElementById('extractedText');
+    if (textarea) {
+        let text = textarea.value;
+        // Remove extra whitespace, fix common OCR errors
+        text = text.replace(/\\s+/g, ' '); // Multiple spaces to single
+        text = text.replace(/\\n\\s*\\n/g, '\\n\\n'); // Clean paragraph breaks
+        text = text.trim();
+        textarea.value = text;
+        markTextAsEdited(textarea);
+    }
+}
+
+function removeExtraSpaces() {
+    const textarea = document.getElementById('extractedText');
+    if (textarea) {
+        textarea.value = textarea.value.replace(/\\s+/g, ' ').trim();
+        markTextAsEdited(textarea);
+    }
+}
+
+function resetText() {
+    if (confirm('Reset text to original OCR result? This will lose all changes.')) {
+        const textarea = document.getElementById('extractedText');
+        if (textarea) {
+            textarea.value = textarea.getAttribute('data-original');
+            textarea.classList.remove('border-warning');
+            hasChanges = false;
+            updateTextStats();
+        }
+    }
+}
+
+function reextractField(button, fieldName) {
+    if (confirm(`Re-extract the "${fieldName}" field from the original document?`)) {
+        // Implement field re-extraction
+        alert('Field re-extraction will be implemented in the next update.');
+    }
+}
+
+function previewChanges() {
+    // Show preview modal with changes
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    const content = document.getElementById('previewContent');
+    
+    // Generate preview content
+    let preview = '<h6>Changed Fields:</h6><ul>';
+    let hasChanges = false;
+    
+    // Check for field changes
+    document.querySelectorAll('input[name^="field_"]').forEach(input => {
+        const original = input.getAttribute('data-original');
+        if (input.value !== original) {
+            const label = input.closest('.col-md-6').querySelector('label').textContent.trim();
+            preview += `<li><strong>${label}:</strong> "${original}" → "${input.value}"</li>`;
+            hasChanges = true;
+        }
+    });
+    
+    // Check for text changes
+    const textarea = document.getElementById('extractedText');
+    if (textarea) {
+        const original = textarea.getAttribute('data-original');
+        if (textarea.value !== original) {
+            preview += `<li><strong>Text Content:</strong> Modified (${textarea.value.length} characters)</li>`;
+            hasChanges = true;
+        }
+    }
+    
+    if (!hasChanges) {
+        preview += '<li class="text-muted">No changes detected</li>';
+    }
+    
+    preview += '</ul>';
+    content.innerHTML = preview;
+    modal.show();
+}
+
+function confirmSave() {
+    document.getElementById('editDocumentForm').submit();
+}
+
+function reprocessDocument() {
+    if (confirm('Reprocess this document? This will overwrite current extracted data.')) {
+        // Implement reprocessing
+        window.location.href = `/documents/{{ document.id }}/reprocess/`;
+    }
+}
+
+function exportDocument() {
+    // Implement export functionality
+    window.open(`/documents/{{ document.id }}/export/`, '_blank');
+}
+
+function viewOriginal() {
+    // Open original file
+    window.open('{{ document.file.url }}', '_blank');
+}
+</script>
+{% endblock %}

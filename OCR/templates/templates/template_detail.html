@@ -1,0 +1,353 @@
+{% extends 'base/base.html' %}
+
+{% block title %}{{ template.name }} - Template Details{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'templates:home' %}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'templates:template_list' %}">Templates</a></li>
+                <li class="breadcrumb-item active">{{ template.name }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2>
+                    <i class="fas fa-file-invoice me-2"></i>
+                    {{ template.name }}
+                </h2>
+                <p class="text-muted mb-0">{{ template.description|default:"No description provided" }}</p>
+            </div>
+            <div class="btn-group" role="group">
+                <a href="{% url 'templates:template_edit' template.id %}" class="btn btn-outline-primary">
+                    <i class="fas fa-edit me-2"></i>
+                    Edit
+                </a>
+                <a href="{% url 'templates:process_template' template.id %}" class="btn btn-success">
+                    <i class="fas fa-cogs me-2"></i>
+                    Use Template
+                </a>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                    <i class="fas fa-trash me-2"></i>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template Overview -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-calendar fa-2x mb-2"></i>
+                <h6>Created</h6>
+                <p class="mb-0">{{ template.created_at|date:"M d, Y" }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-list fa-2x mb-2"></i>
+                <h6>Fields</h6>
+                <p class="mb-0">{{ template.field_count }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-{% if template.processing_status == 'completed' %}success{% elif template.processing_status == 'failed' %}danger{% else %}warning{% endif %} text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-{% if template.processing_status == 'completed' %}check-circle{% elif template.processing_status == 'failed' %}exclamation-circle{% else %}clock{% endif %} fa-2x mb-2"></i>
+                <h6>Status</h6>
+                <p class="mb-0">{{ template.get_processing_status_display|default:template.processing_status }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-secondary text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-{% if template.is_active %}toggle-on{% else %}toggle-off{% endif %} fa-2x mb-2"></i>
+                <h6>Status</h6>
+                <p class="mb-0">{% if template.is_active %}Active{% else %}Inactive{% endif %}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template Content -->
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Template Structure -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-sitemap me-2"></i>
+                    Template Structure
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if template.structure %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Field Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for field in template.get_field_names %}
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-tag me-2 text-muted"></i>
+                                        {{ field }}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark">Text</span>
+                                    </td>
+                                    <td>
+                                        <i class="fas fa-check text-success"></i>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editField('{{ field }}')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-exclamation-circle fa-3x text-warning mb-3"></i>
+                        <h6>No Structure Data</h6>
+                        <p class="text-muted">Template structure has not been processed yet or processing failed.</p>
+                        <button class="btn btn-primary" onclick="reprocessTemplate({{ template.id }})">
+                            <i class="fas fa-sync me-2"></i>
+                            Reprocess Template
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Processing History -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-history me-2"></i>
+                    Processing History
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-primary"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Template Created</h6>
+                            <p class="text-muted mb-1">Template was uploaded and saved to the system</p>
+                            <small class="text-muted">{{ template.created_at|date:"M d, Y H:i" }}</small>
+                        </div>
+                    </div>
+                    {% if template.processing_status == 'completed' %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-success"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Processing Completed</h6>
+                            <p class="text-muted mb-1">OCR processing finished successfully</p>
+                            <small class="text-muted">{{ template.updated_at|date:"M d, Y H:i" }}</small>
+                        </div>
+                    </div>
+                    {% elif template.processing_status == 'failed' %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-danger"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Processing Failed</h6>
+                            <p class="text-muted mb-1">An error occurred during OCR processing</p>
+                            <small class="text-muted">{{ template.updated_at|date:"M d, Y H:i" }}</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- File Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-file me-2"></i>
+                    File Information
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if template.file %}
+                <div class="mb-3">
+                    <strong>File Name:</strong><br>
+                    <span class="text-muted">{{ template.file.name|default:"Not available" }}</span>
+                </div>
+                <div class="mb-3">
+                    <strong>File Size:</strong><br>
+                    <span class="text-muted">{{ template.file.size|filesizeformat|default:"Unknown" }}</span>
+                </div>
+                <div class="mb-3">
+                    <strong>Upload Date:</strong><br>
+                    <span class="text-muted">{{ template.created_at|date:"M d, Y H:i" }}</span>
+                </div>
+                <div class="d-grid">
+                    <a href="{{ template.file.url }}" class="btn btn-outline-primary" target="_blank">
+                        <i class="fas fa-download me-2"></i>
+                        Download Original
+                    </a>
+                </div>
+                {% else %}
+                <p class="text-muted">No file attached to this template.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>
+                    Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'templates:process_template' template.id %}" class="btn btn-success">
+                        <i class="fas fa-play me-2"></i>
+                        Process Documents
+                    </a>
+                    <a href="{% url 'templates:template_edit' template.id %}" class="btn btn-outline-primary">
+                        <i class="fas fa-edit me-2"></i>
+                        Edit Template
+                    </a>
+                    <button class="btn btn-outline-info" onclick="duplicateTemplate({{ template.id }})">
+                        <i class="fas fa-copy me-2"></i>
+                        Duplicate Template
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="exportTemplate({{ template.id }})">
+                        <i class="fas fa-download me-2"></i>
+                        Export Structure
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                    Confirm Deletion
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the template <strong>"{{ template.name }}"</strong>?</p>
+                <p class="text-danger">
+                    <i class="fas fa-warning me-2"></i>
+                    This action cannot be undone and will affect any documents processed with this template.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="{% url 'templates:template_delete' template.id %}" class="btn btn-danger">
+                    <i class="fas fa-trash me-2"></i>
+                    Delete Template
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    top: 5px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 3px #dee2e6;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 3px solid #007bff;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editField(fieldName) {
+    alert('Edit field: ' + fieldName + '\n(Feature coming soon)');
+}
+
+function reprocessTemplate(templateId) {
+    if (confirm('Reprocess this template? This may take a few minutes.')) {
+        // Implement reprocessing logic
+        alert('Reprocessing started...');
+    }
+}
+
+function duplicateTemplate(templateId) {
+    if (confirm('Create a copy of this template?')) {
+        // Implement duplication logic
+        alert('Template duplicated successfully!');
+    }
+}
+
+function exportTemplate(templateId) {
+    // Implement export logic
+    alert('Exporting template structure...');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,263 @@
+{% extends 'base/base.html' %}
+
+{% block title %}OCR Web Application - Home{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="jumbotron bg-primary text-white p-5 rounded">
+            <div class="text-center">
+                <h1 class="display-4">
+                    <i class="fas fa-scan-a me-3"></i>
+                    OCR Web Application
+                </h1>
+                <p class="lead">
+                    Advanced Optical Character Recognition with Template Processing and Intelligent Text Extraction
+                </p>
+                <hr class="my-4" style="border-color: rgba(255,255,255,0.3);">
+                <p class="mb-4">
+                    Choose from three powerful workflows to process your documents with precision and efficiency.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Three Workflows Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h2 class="text-center mb-4">
+            <i class="fas fa-workflow me-2"></i>
+            Choose Your OCR Workflow
+        </h2>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <!-- Workflow 1: Template Upload -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header bg-info text-white text-center">
+                <i class="fas fa-file-invoice fa-2x mb-2"></i>
+                <h5 class="card-title mb-0">Template Upload</h5>
+                <small>Baseline Structure Extraction</small>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    Upload master form templates to extract field structures and create processing baselines 
+                    for automated document processing.
+                </p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>Extract form field structures</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Create processing templates</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Define data extraction rules</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'templates:template_list' %}" class="btn btn-info btn-block w-100">
+                    <i class="fas fa-upload me-2"></i>
+                    Manage Templates
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workflow 2: Document Processing -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header bg-success text-white text-center">
+                <i class="fas fa-folder-open fa-2x mb-2"></i>
+                <h5 class="card-title mb-0">Document Processing</h5>
+                <small>Fill Documents Using Template</small>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    Process documents against existing templates for automated data extraction and 
+                    form filling with high accuracy.
+                </p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>Template-based processing</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Automated data extraction</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Structured output format</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'documents:document_list' %}" class="btn btn-success btn-block w-100">
+                    <i class="fas fa-cogs me-2"></i>
+                    Process Documents
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workflow 3: Text Editor -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header bg-warning text-dark text-center">
+                <i class="fas fa-edit fa-2x mb-2"></i>
+                <h5 class="card-title mb-0">Text Editor</h5>
+                <small>General Text Extraction Mode</small>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    Extract text from any document format with advanced OCR processing and 
+                    built-in text editing capabilities.
+                </p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>Universal document support</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Advanced text editing</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Export multiple formats</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'editor:text_document_list' %}" class="btn btn-warning btn-block w-100">
+                    <i class="fas fa-font me-2"></i>
+                    Extract & Edit Text
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-center mb-4">
+            <i class="fas fa-chart-bar me-2"></i>
+            Quick Overview
+        </h3>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white text-center">
+            <div class="card-body">
+                <i class="fas fa-file-invoice fa-3x mb-3"></i>
+                <h3>{{ total_templates }}</h3>
+                <p class="mb-0">Active Templates</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white text-center">
+            <div class="card-body">
+                <i class="fas fa-cogs fa-3x mb-3"></i>
+                <h3>Multi-Engine</h3>
+                <p class="mb-0">OCR Support</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white text-center">
+            <div class="card-body">
+                <i class="fas fa-file-image fa-3x mb-3"></i>
+                <h3>6+ Formats</h3>
+                <p class="mb-0">File Types</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark text-center">
+            <div class="card-body">
+                <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
+                <h3>50MB Max</h3>
+                <p class="mb-0">File Size</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Templates Section -->
+{% if recent_templates %}
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="mb-4">
+            <i class="fas fa-clock me-2"></i>
+            Recent Templates
+        </h3>
+        <div class="row">
+            {% for template in recent_templates %}
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-file-alt me-2"></i>
+                            {{ template.name }}
+                        </h6>
+                        <p class="card-text text-muted small">
+                            {{ template.description|default:"No description" }}
+                        </p>
+                        <small class="text-muted">
+                            <i class="fas fa-calendar me-1"></i>
+                            {{ template.created_at|date:"M d, Y" }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="text-center mt-3">
+            <a href="{% url 'templates:template_list' %}" class="btn btn-outline-primary">
+                <i class="fas fa-list me-2"></i>
+                View All Templates
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Getting Started Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h4 class="card-title text-center mb-4">
+                    <i class="fas fa-rocket me-2"></i>
+                    Getting Started
+                </h4>
+                <div class="row">
+                    <div class="col-md-4 text-center mb-3">
+                        <div class="mb-3">
+                            <i class="fas fa-upload fa-2x text-primary"></i>
+                        </div>
+                        <h6>1. Upload Templates</h6>
+                        <p class="text-muted small">
+                            Start by uploading master form templates to create processing baselines.
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-center mb-3">
+                        <div class="mb-3">
+                            <i class="fas fa-cogs fa-2x text-success"></i>
+                        </div>
+                        <h6>2. Process Documents</h6>
+                        <p class="text-muted small">
+                            Use templates to automatically extract data from similar documents.
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-center mb-3">
+                        <div class="mb-3">
+                            <i class="fas fa-download fa-2x text-info"></i>
+                        </div>
+                        <h6>3. Export Results</h6>
+                        <p class="text-muted small">
+                            Export extracted data in multiple formats for further processing.
+                        </p>
+                    </div>
+                </div>
+                <div class="text-center mt-4">
+                    <a href="{% url 'templates:template_upload' %}" class="btn btn-primary me-3">
+                        <i class="fas fa-plus me-2"></i>
+                        Upload First Template
+                    </a>
+                    <a href="{% url 'editor:upload_text_document' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-file-text me-2"></i>
+                        Quick Text Extract
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

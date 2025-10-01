@@ -1,0 +1,645 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Templates - OCR Web Application{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-file-invoice me-2"></i>
+                Template Management
+            </h2>
+            <a href="{% url 'templates:template_upload' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>
+                Upload New Template
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filter -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="input-group">
+            <span class="input-group-text">
+                <i class="fas fa-search"></i>
+            </span>
+            <input type="text" class="form-control" id="searchTemplates" placeholder="Search templates...">
+        </div>
+    </div>
+    <div class="col-md-6">
+        <select class="form-select" id="statusFilter">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+        </select>
+    </div>
+</div>
+
+<!-- Templates Grid -->
+{% if templates %}
+<div class="row" id="templatesGrid">
+    {% for template in templates %}
+    <div class="col-md-6 col-lg-4 mb-4 template-card" data-status="{{ template.processing_status }}">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="fas fa-file-alt me-2"></i>
+                    {{ template.name }}
+                </h6>
+                <span class="badge bg-{% if template.is_active %}success{% else %}secondary{% endif %}">
+                    {% if template.is_active %}Active{% else %}Inactive{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <p class="card-text text-muted">
+                    {{ template.description|default:"No description provided"|truncatechars:100 }}
+                </p>
+                
+                <div class="row text-center">
+                    <div class="col-4">
+                        <small class="text-muted">Fields</small>
+                        <div class="fw-bold">{{ template.field_count }}</div>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Status</small>
+                        <div class="fw-bold">
+                            {% if template.processing_status == 'completed' %}
+                                <i class="fas fa-check-circle text-success"></i>
+                            {% elif template.processing_status == 'processing' %}
+                                <i class="fas fa-spinner fa-spin text-primary"></i>
+                            {% elif template.processing_status == 'failed' %}
+                                <i class="fas fa-exclamation-circle text-danger"></i>
+                            {% else %}
+                                <i class="fas fa-clock text-warning"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Created</small>
+                        <div class="fw-bold">{{ template.created_at|date:"M d" }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="d-grid gap-2">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                data-template-id="{{ template.id }}"
+                                data-template-name="{{ template.name }}"
+                                data-template-description="{{ template.description|default:'No description provided' }}"
+                                data-template-fields="{{ template.field_count }}"
+                                data-template-status="{{ template.processing_status }}"
+                                data-template-created="{{ template.created_at|date:'M d, Y' }}"
+                                data-template-active="{{ template.is_active|yesno:'true,false' }}"
+                                onclick="showTemplatePreview(this)">
+                            <i class="fas fa-eye"></i>
+                            View
+                        </button>
+                        <a href="{% url 'templates:template_edit' template.id %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-edit"></i>
+                            Edit
+                        </a>
+                    </div>
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'templates:process_template' template.id %}" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-cogs"></i>
+                            Use Template
+                        </a>
+                        <button type="button" class="btn btn-outline-danger btn-sm" 
+                                data-template-id="{{ template.id }}"
+                                data-template-name="{{ template.name }}"
+                                onclick="confirmDeleteTemplate(this)">
+                            <i class="fas fa-trash"></i>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if templates.has_other_pages %}
+<nav aria-label="Templates pagination">
+    <ul class="pagination justify-content-center">
+        {% if templates.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1">&laquo; First</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ templates.previous_page_number }}">Previous</a>
+            </li>
+        {% endif %}
+        
+        <li class="page-item active">
+            <span class="page-link">
+                Page {{ templates.number }} of {{ templates.paginator.num_pages }}
+            </span>
+        </li>
+        
+        {% if templates.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ templates.next_page_number }}">Next</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ templates.paginator.num_pages }}">Last &raquo;</a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="row">
+    <div class="col-12">
+        <div class="text-center py-5">
+            <i class="fas fa-file-invoice fa-4x text-muted mb-4"></i>
+            <h4 class="text-muted mb-3">No Templates Found</h4>
+            <p class="text-muted mb-4">
+                Get started by uploading your first template to begin processing documents.
+            </p>
+            <a href="{% url 'templates:template_upload' %}" class="btn btn-primary btn-lg">
+                <i class="fas fa-plus me-2"></i>
+                Upload Your First Template
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Template Preview Modal -->
+<div class="modal fade" id="templatePreviewModal" tabindex="-1" aria-labelledby="templatePreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="templatePreviewModalLabel">
+                    <i class="fas fa-file-invoice me-2"></i>
+                    <span id="modalTemplateName"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Template Information -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Template Information
+                                </h6>
+                                <p class="card-text mb-2">
+                                    <strong>Description:</strong> <span id="modalDescription"></span>
+                                </p>
+                                <p class="card-text mb-2">
+                                    <strong>Status:</strong> 
+                                    <span id="modalStatus" class="badge"></span>
+                                </p>
+                                <p class="card-text mb-2">
+                                    <strong>Created:</strong> <span id="modalCreatedDate"></span>
+                                </p>
+                                <p class="card-text mb-0">
+                                    <strong>Fields Count:</strong> <span id="modalFieldCount"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-chart-bar me-2"></i>
+                                    Quick Stats
+                                </h6>
+                                <div class="row text-center">
+                                    <div class="col-4">
+                                        <div class="fw-bold text-primary fs-4" id="modalFieldCountDisplay"></div>
+                                        <small class="text-muted">Fields</small>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="fw-bold text-success fs-4" id="modalProcessingStatus"></div>
+                                        <small class="text-muted">Status</small>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="fw-bold text-info fs-4" id="modalActiveStatus"></div>
+                                        <small class="text-muted">Active</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Template Preview Image (if available) -->
+                <div class="row mb-4" id="templateImageSection" style="display: none;">
+                    <div class="col-12">
+                        <h6>
+                            <i class="fas fa-image me-2"></i>
+                            Template Preview
+                        </h6>
+                        <div class="text-center">
+                            <img id="templatePreviewImage" src="" alt="Template Preview" class="img-fluid border rounded" style="max-height: 300px;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Field Structure Preview -->
+                <div class="row" id="fieldStructureSection">
+                    <div class="col-12">
+                        <h6>
+                            <i class="fas fa-list me-2"></i>
+                            Field Structure
+                        </h6>
+                        <div id="fieldStructureContent">
+                            <div class="text-center text-muted py-3">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                Loading field structure...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="d-grid gap-2">
+                    <div class="btn-group w-100" role="group">
+                        <a id="modalEditBtn" href="#" class="btn btn-outline-primary">
+                            <i class="fas fa-edit me-2"></i>
+                            Edit Template
+                        </a>
+                        <a id="modalUseBtn" href="#" class="btn btn-success">
+                            <i class="fas fa-cogs me-2"></i>
+                            Use Template
+                        </a>
+                        <a id="modalDetailBtn" href="#" class="btn btn-outline-secondary">
+                            <i class="fas fa-external-link-alt me-2"></i>
+                            Full Details
+                        </a>
+                    </div>
+                    <button id="modalDeleteBtn" type="button" class="btn btn-danger">
+                        <i class="fas fa-trash me-2"></i>
+                        Delete Template
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Delete Template
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-4">
+                    <i class="fas fa-trash-alt fa-4x text-danger mb-3"></i>
+                    <h5 class="text-danger">Are you sure?</h5>
+                    <p class="text-muted">This action cannot be undone.</p>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Template to be deleted:
+                    </h6>
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>Name:</strong><br>
+                            <span id="deleteTemplateName" class="text-muted"></span>
+                        </div>
+                        <div>
+                            <strong>ID:</strong><br>
+                            <span id="deleteTemplateId" class="text-muted"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> Deleting this template will also remove all associated documents and field structures.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash me-2"></i>
+                    Delete Template
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Search functionality
+    const searchInput = document.getElementById('searchTemplates');
+    const statusFilter = document.getElementById('statusFilter');
+    const templateCards = document.querySelectorAll('.template-card');
+    
+    function filterTemplates() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const statusValue = statusFilter.value.toLowerCase();
+        
+        templateCards.forEach(card => {
+            const templateName = card.querySelector('.card-header h6').textContent.toLowerCase();
+            const templateDescription = card.querySelector('.card-text').textContent.toLowerCase();
+            const templateStatus = card.dataset.status.toLowerCase();
+            
+            const matchesSearch = templateName.includes(searchTerm) || templateDescription.includes(searchTerm);
+            const matchesStatus = !statusValue || templateStatus.includes(statusValue);
+            
+            if (matchesSearch && matchesStatus) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+    
+    searchInput.addEventListener('input', filterTemplates);
+    statusFilter.addEventListener('change', filterTemplates);
+});
+
+// Helper function to safely set element content
+function safeSetContent(elementId, content) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = content;
+    } else {
+        console.error(`Element with ID '${elementId}' not found`);
+    }
+}
+
+// Helper function to safely set element HTML
+function safeSetHTML(elementId, html) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.innerHTML = html;
+    } else {
+        console.error(`Element with ID '${elementId}' not found`);
+    }
+}
+
+// Template Preview Modal Function
+function showTemplatePreview(buttonElement) {
+    const templateId = buttonElement.dataset.templateId;
+    const templateName = buttonElement.dataset.templateName;
+    const templateDescription = buttonElement.dataset.templateDescription;
+    const templateFields = buttonElement.dataset.templateFields;
+    const templateStatus = buttonElement.dataset.templateStatus;
+    const templateCreated = buttonElement.dataset.templateCreated;
+    const templateActive = buttonElement.dataset.templateActive === 'true';
+    
+    // Update modal content
+    safeSetContent('modalTemplateName', templateName);
+    safeSetContent('modalDescription', templateDescription);
+    safeSetContent('modalCreatedDate', templateCreated);
+    safeSetContent('modalFieldCount', templateFields);
+    safeSetContent('modalFieldCountDisplay', templateFields);
+    
+    // Update status badge
+    const statusBadge = document.getElementById('modalStatus');
+    
+    if (statusBadge) {
+        statusBadge.className = 'badge';
+        if (templateStatus === 'completed') {
+            statusBadge.classList.add('bg-success');
+            statusBadge.textContent = 'Completed';
+            safeSetHTML('modalProcessingStatus', '<i class="fas fa-check-circle"></i>');
+        } else if (templateStatus === 'processing') {
+            statusBadge.classList.add('bg-primary');
+            statusBadge.textContent = 'Processing';
+            safeSetHTML('modalProcessingStatus', '<i class="fas fa-spinner fa-spin"></i>');
+        } else if (templateStatus === 'failed') {
+            statusBadge.classList.add('bg-danger');
+            statusBadge.textContent = 'Failed';
+            safeSetHTML('modalProcessingStatus', '<i class="fas fa-exclamation-circle"></i>');
+        } else {
+            statusBadge.classList.add('bg-warning');
+            statusBadge.textContent = 'Pending';
+            safeSetHTML('modalProcessingStatus', '<i class="fas fa-clock"></i>');
+        }
+    }
+    
+    // Update active status
+    if (templateActive) {
+        safeSetHTML('modalActiveStatus', '<i class="fas fa-check-circle"></i>');
+    } else {
+        safeSetHTML('modalActiveStatus', '<i class="fas fa-times-circle"></i>');
+    }
+    
+    // Update action buttons
+    const editBtn = document.getElementById('modalEditBtn');
+    const useBtn = document.getElementById('modalUseBtn');
+    const detailBtn = document.getElementById('modalDetailBtn');
+    
+    if (editBtn) editBtn.href = `/${templateId}/edit/`;
+    if (useBtn) useBtn.href = `/${templateId}/process/`;
+    if (detailBtn) detailBtn.href = `/${templateId}/`;
+    
+    // Update delete button
+    updateModalDeleteButton(templateId, templateName);
+    
+    // Load field structure
+    loadTemplateFields(templateId);
+    
+    // Show modal
+    const modalElement = document.getElementById('templatePreviewModal');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    } else {
+        console.error('Template preview modal not found');
+        alert('Error: Could not open template preview');
+    }
+}
+
+// Load template field structure
+function loadTemplateFields(templateId) {
+    const fieldStructureContent = document.getElementById('fieldStructureContent');
+    
+    // Show loading state
+    fieldStructureContent.innerHTML = `
+        <div class="text-center text-muted py-3">
+            <i class="fas fa-spinner fa-spin"></i>
+            Loading field structure...
+        </div>
+    `;
+    
+    // Fetch field structure
+    fetch(`/${templateId}/fields/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.fields && data.fields.length > 0) {
+                let fieldsHtml = '<div class="list-group">';
+                data.fields.forEach((field, index) => {
+                    fieldsHtml += `
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-tag me-2"></i>
+                                    ${field.name || `Field ${index + 1}`}
+                                </h6>
+                                <small class="text-muted">
+                                    Type: ${field.type || 'text'} | 
+                                    Position: (${field.x || 0}, ${field.y || 0}) | 
+                                    Size: ${field.width || 0}×${field.height || 0}
+                                </small>
+                            </div>
+                            <span class="badge bg-primary rounded-pill">${index + 1}</span>
+                        </div>
+                    `;
+                });
+                fieldsHtml += '</div>';
+                fieldStructureContent.innerHTML = fieldsHtml;
+            } else {
+                fieldStructureContent.innerHTML = `
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-info-circle"></i>
+                        No field structure available
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading field structure:', error);
+            fieldStructureContent.innerHTML = `
+                <div class="text-center text-danger py-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Error loading field structure
+                </div>
+            `;
+            showErrorToast('Failed to load template field structure');
+        });
+}
+
+// Template deletion functions
+function confirmDeleteTemplate(buttonElement) {
+    const templateId = buttonElement.dataset.templateId;
+    const templateName = buttonElement.dataset.templateName;
+    
+    // Update modal content
+    safeSetContent('deleteTemplateName', templateName);
+    safeSetContent('deleteTemplateId', templateId);
+    
+    // Store template ID for deletion
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.setAttribute('data-template-id', templateId);
+        confirmDeleteBtn.setAttribute('data-template-name', templateName);
+    }
+    
+    // Show confirmation modal
+    const modalElement = document.getElementById('deleteConfirmModal');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    }
+}
+
+// Handle delete confirmation
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', function() {
+            const templateId = this.getAttribute('data-template-id');
+            const templateName = this.getAttribute('data-template-name');
+            
+            if (templateId) {
+                // Show loading state
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Deleting...';
+                this.disabled = true;
+                
+                // Create form and submit
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/${templateId}/delete/`;
+                
+                // Add CSRF token
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+                if (csrfToken) {
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrfmiddlewaretoken';
+                    csrfInput.value = csrfToken.value;
+                    form.appendChild(csrfInput);
+                } else {
+                    // Try to get CSRF token from cookies
+                    const csrfCookie = getCookie('csrftoken');
+                    if (csrfCookie) {
+                        const csrfInput = document.createElement('input');
+                        csrfInput.type = 'hidden';
+                        csrfInput.name = 'csrfmiddlewaretoken';
+                        csrfInput.value = csrfCookie;
+                        form.appendChild(csrfInput);
+                    }
+                }
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    }
+});
+
+// Update modal delete button click handler in showTemplatePreview
+function updateModalDeleteButton(templateId, templateName) {
+    const modalDeleteBtn = document.getElementById('modalDeleteBtn');
+    if (modalDeleteBtn) {
+        modalDeleteBtn.setAttribute('data-template-id', templateId);
+        modalDeleteBtn.setAttribute('data-template-name', templateName);
+        
+        // Remove existing event listeners
+        modalDeleteBtn.replaceWith(modalDeleteBtn.cloneNode(true));
+        const newModalDeleteBtn = document.getElementById('modalDeleteBtn');
+        
+        newModalDeleteBtn.addEventListener('click', function() {
+            // Close preview modal first
+            const previewModal = bootstrap.Modal.getInstance(document.getElementById('templatePreviewModal'));
+            if (previewModal) {
+                previewModal.hide();
+            }
+            
+            // Show delete confirmation
+            setTimeout(() => {
+                confirmDeleteTemplate(this);
+            }, 300);
+        });
+    }
+}
+
+// Utility function to get cookie value
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

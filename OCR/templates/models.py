@@ -19,7 +19,7 @@ class Template(models.Model):
     )
     
     # Metadata
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -49,11 +49,19 @@ class Template(models.Model):
     def field_count(self):
         """Return the number of fields detected in this template"""
         if self.structure and 'fields' in self.structure:
-            return len(self.structure['fields'])
+            fields = self.structure['fields']
+            if isinstance(fields, (list, dict)):
+                return len(fields)
         return 0
     
     def get_field_names(self):
         """Return list of field names from the template structure"""
         if self.structure and 'fields' in self.structure:
-            return list(self.structure['fields'].keys())
+            fields = self.structure['fields']
+            if isinstance(fields, list):
+                # If fields is a list of field objects
+                return [field.get('name', f'Field {i+1}') for i, field in enumerate(fields)]
+            elif isinstance(fields, dict):
+                # If fields is a dictionary
+                return list(fields.keys())
         return []

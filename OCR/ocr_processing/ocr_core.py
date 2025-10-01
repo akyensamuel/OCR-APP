@@ -105,9 +105,25 @@ class OCREngine:
     def _init_easyocr(self):
         """Initialize EasyOCR reader"""
         try:
-            self.easyocr_reader = easyocr.Reader(['en'])
+            # Fix Windows Unicode issues by setting proper locale
+            import os
+            import locale
+            
+            # Set UTF-8 encoding for Windows
+            if os.name == 'nt':  # Windows
+                try:
+                    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+                except:
+                    try:
+                        locale.setlocale(locale.LC_ALL, '')
+                    except:
+                        pass
+            
+            # Initialize with verbose=False to avoid Unicode progress bar issues
+            self.easyocr_reader = easyocr.Reader(['en'], verbose=False)
         except Exception as e:
             logger.warning(f"Could not initialize EasyOCR: {e}")
+            self.easyocr_reader = None
     
     def extract_text_tesseract(self, image: np.ndarray) -> OCRResult:
         """Extract text using Tesseract OCR"""
@@ -162,11 +178,18 @@ class OCREngine:
     def extract_text(self, image_path: str, preprocess: bool = True) -> OCRResult:
         """Main text extraction method"""
         try:
+            # Check if it's a PDF file
+            if image_path.lower().endswith('.pdf'):
+                return self._process_pdf(image_path, preprocess)
+            
             # Preprocess image if requested
             if preprocess:
                 image = ImagePreprocessor.preprocess_image(image_path)
             else:
                 image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            
+            if image is None:
+                raise ValueError(f"Could not load image: {image_path}")
             
             # Try preferred engine first
             if self.preferred_engine == "tesseract" and self.tesseract_available:
@@ -185,6 +208,67 @@ class OCREngine:
         except Exception as e:
             logger.error(f"OCR extraction failed: {e}")
             return OCRResult(text="", confidence=0.0, engine="error")
+    
+    def _process_pdf(self, pdf_path: str, preprocess: bool = True) -> OCRResult:
+        """Process PDF file by converting to images first"""
+        try:
+            # Try to process PDF if pdf2image is available
+            try:
+                from pdf2image import convert_from_path
+                
+                # Convert PDF to images
+                images = convert_from_path(pdf_path, first_page=1, last_page=1)  # Process first page only
+                if not images:
+                    raise ValueError("No images extracted from PDF")
+                
+                # Convert PIL image to numpy array
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                    images[0].save(tmp.name, 'PNG')
+                    
+                    # Process the image with OCR
+                    if preprocess:
+                        image = ImagePreprocessor.preprocess_image(tmp.name)
+                    else:
+                        image = cv2.imread(tmp.name, cv2.IMREAD_GRAYSCALE)
+                    
+                    # Extract text using available engine
+                    if self.preferred_engine == "tesseract" and self.tesseract_available:
+                        result = self.extract_text_tesseract(image)
+                    elif self.preferred_engine == "easyocr" and self.easyocr_reader:
+                        result = self.extract_text_easyocr(image)
+                    elif self.tesseract_available:
+                        result = self.extract_text_tesseract(image)
+                    elif self.easyocr_reader:
+                        result = self.extract_text_easyocr(image)
+                    else:
+                        return OCRResult(text="", confidence=0.0, engine="no_engine")
+                    
+                    # Clean up temp file
+                    import os
+                    os.unlink(tmp.name)
+                    
+                    return OCRResult(
+                        text=result.text,
+                        confidence=result.confidence,
+                        engine=f"pdf_{result.engine}"
+                    )
+                    
+            except ImportError:
+                # pdf2image not available, return informative message
+                return OCRResult(
+                    text="PDF processing requires pdf2image library. Please install it for PDF support.",
+                    confidence=0.0,
+                    engine="pdf_missing_dependency"
+                )
+                
+        except Exception as e:
+            logger.error(f"PDF processing failed: {e}")
+            return OCRResult(
+                text=f"PDF processing error: {str(e)}",
+                confidence=0.0,
+                engine="pdf_error"
+            )
 
 class TemplateProcessor:
     """Process documents using predefined templates"""
@@ -196,27 +280,71 @@ class TemplateProcessor:
         """Extract field structure from a template document"""
         ocr_result = self.ocr_engine.extract_text(image_path)
         
-        # Basic structure extraction - identify potential form fields
+        # Check if OCR was successful
+        if not ocr_result.text or ocr_result.engine == "error":
+            # Return empty structure with error information
+            return {
+                'fields': [],
+                'total_fields': 0,
+                'extraction_confidence': 0.0,
+                'ocr_engine': ocr_result.engine,
+                'error': 'OCR extraction failed - no text extracted'
+            }
+        
+        # Enhanced structure extraction - identify potential form fields
         lines = ocr_result.text.split('\n')
         fields = []
         
         for line in lines:
             line = line.strip()
-            if ':' in line or '_' in line or line.endswith('?'):
-                # Potential field detected
-                field_name = line.replace(':', '').replace('_', ' ').strip()
-                if field_name:
-                    fields.append({
-                        'name': field_name,
-                        'type': 'text',
-                        'required': True
-                    })
+            if line:  # Skip empty lines
+                # More flexible field detection patterns
+                potential_field = None
+                
+                # Pattern 1: "Label:" format
+                if ':' in line:
+                    parts = line.split(':', 1)
+                    if len(parts) == 2:
+                        label = parts[0].strip()
+                        if label and not label.isupper() or len(label.split()) <= 3:  # Reasonable field names
+                            potential_field = label
+                
+                # Pattern 2: "Label ___" format (underscores indicating blank space)
+                elif '_' in line and line.count('_') >= 3:
+                    # Find text before underscores
+                    underscore_pos = line.find('_')
+                    if underscore_pos > 0:
+                        label = line[:underscore_pos].strip()
+                        if label and len(label.split()) <= 4:
+                            potential_field = label
+                
+                # Pattern 3: Question format
+                elif line.endswith('?'):
+                    if len(line) < 50:  # Reasonable question length
+                        potential_field = line[:-1].strip()
+                
+                # Pattern 4: Common form words
+                elif any(word in line.lower() for word in ['name', 'address', 'phone', 'email', 'date', 'number', 'id']):
+                    if len(line) < 30:  # Short enough to be a field label
+                        potential_field = line
+                
+                # Add field if detected and valid
+                if potential_field:
+                    # Clean up the field name
+                    field_name = potential_field.replace('_', ' ').strip()
+                    if field_name and field_name not in [f['name'] for f in fields]:  # Avoid duplicates
+                        fields.append({
+                            'name': field_name,
+                            'type': 'text',
+                            'required': True
+                        })
         
         return {
             'fields': fields,
             'total_fields': len(fields),
             'extraction_confidence': ocr_result.confidence,
-            'ocr_engine': ocr_result.engine
+            'ocr_engine': ocr_result.engine,
+            'raw_text': ocr_result.text  # Include raw text for debugging
         }
     
     def process_document_with_template(self, image_path: str, template_structure: Dict) -> List[FieldData]:

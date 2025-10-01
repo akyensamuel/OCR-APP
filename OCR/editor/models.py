@@ -13,7 +13,7 @@ class TextDocument(models.Model):
     ]
     
     title = models.CharField(max_length=200)
-    original_file = models.FileField(upload_to='uploads/editor/', blank=True)
+    original_file = models.FileField(upload_to='uploads/editor/', blank=True, null=True)
     extracted_text = models.TextField(blank=True)
     confidence_score = models.FloatField(default=0.0)
     processing_status = models.CharField(
