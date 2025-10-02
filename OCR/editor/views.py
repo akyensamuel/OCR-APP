@@ -91,10 +91,72 @@ def export_text_document(request, document_id):
     """Export document as text file"""
     document = get_object_or_404(TextDocument, id=document_id)
     
+    # Check for format parameter
+    export_format = request.GET.get('format', 'txt')
+    
+    if export_format == 'docx':
+        return export_text_document_docx(request, document_id)
+    
+    # Default to text export
     response = HttpResponse(document.extracted_text, content_type='text/plain')
     response['Content-Disposition'] = f'attachment; filename="{document.title}.txt"'
     
     return response
+
+
+def export_text_document_docx(request, document_id):
+    """Export text document as Word (DOCX) file"""
+    document = get_object_or_404(TextDocument, id=document_id)
+    
+    try:
+        from ocr_processing.docx_exporter import DocxExporter
+        from datetime import datetime
+        import tempfile
+        
+        # Create temporary file
+        temp_dir = tempfile.gettempdir()
+        filename = f"{document.title.replace('.', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+        output_path = os.path.join(temp_dir, filename)
+        
+        # Prepare metadata
+        metadata = {
+            'Document Title': document.title,
+            'Processed Date': document.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'Confidence Score': f"{document.confidence_score:.1f}%" if document.confidence_score else "N/A",
+            'Word Count': str(document.word_count),
+            'Character Count': str(document.char_count)
+        }
+        
+        # Create DOCX
+        docx_exporter = DocxExporter()
+        docx_path = docx_exporter.export_plain_text_to_docx(
+            document.extracted_text,
+            output_path,
+            title=document.title,
+            metadata=metadata
+        )
+        
+        # Return file as download
+        with open(docx_path, 'rb') as docx_file:
+            response = HttpResponse(
+                docx_file.read(),
+                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+        # Clean up temp file
+        try:
+            os.remove(docx_path)
+        except:
+            pass
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        messages.error(request, f'Error exporting to Word: {str(e)}')
+        return redirect('editor:edit_text_document', document_id=document_id)
 
 
 def delete_text_document(request, document_id):

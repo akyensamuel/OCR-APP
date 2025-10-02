@@ -26,6 +26,14 @@ class Document(models.Model):
         help_text="Extracted structured data based on template fields"
     )
     
+    # Excel file with populated data (for table-based templates)
+    excel_file = models.FileField(
+        upload_to='documents/excel/',
+        blank=True,
+        null=True,
+        help_text="Populated Excel file with extracted data"
+    )
+    
     # Raw text version (for general text extraction mode)
     text_version = models.TextField(
         blank=True, 

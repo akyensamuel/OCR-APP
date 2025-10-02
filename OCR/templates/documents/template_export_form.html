@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Export All Documents - {{ template.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-file-earmark-excel"></i> Export All Documents to Excel
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Template:</strong> {{ template.name }}<br>
+                        <strong>Documents to Export:</strong> {{ document_count }}<br>
+                        <strong>Fields:</strong> {{ template.field_count }}
+                    </div>
+
+                    {% if document_count == 0 %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        No processed documents found for this template.
+                    </div>
+                    <a href="{% url 'templates:template_detail' template.id %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Template
+                    </a>
+                    {% else %}
+                    <p class="mb-4">
+                        This will create a consolidated Excel file containing data from all {{ document_count }} 
+                        processed document(s) using this template. Each document will be a row in the Excel file.
+                    </p>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="export_filename" class="form-label">
+                                <strong>Excel Filename</strong>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="export_filename" 
+                                name="export_filename" 
+                                placeholder="e.g., consolidated_data" 
+                                value="{{ template.name|slugify }}_export"
+                            >
+                            <small class="form-text text-muted">
+                                .xlsx extension will be added automatically
+                            </small>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'templates:template_detail' template.id %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-download"></i> Export {{ document_count }} Document(s)
+                            </button>
+                        </div>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

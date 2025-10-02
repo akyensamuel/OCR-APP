@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Export Document to Excel - {{ document.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Document:</strong> {{ document.name }}<br>
+                        {% if document.template %}
+                        <strong>Template:</strong> {{ document.template.name }}<br>
+                        {% endif %}
+                        <strong>Created:</strong> {{ document.created_at|date:"M d, Y H:i" }}
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="export_filename" class="form-label">
+                                <strong>Excel Filename</strong>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="export_filename" 
+                                name="export_filename" 
+                                placeholder="e.g., my_data_export" 
+                                value="{{ document.name|cut:'.jpg'|cut:'.png'|cut:'.pdf' }}_export"
+                            >
+                            <small class="form-text text-muted">
+                                .xlsx extension will be added automatically
+                            </small>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'documents:document_detail' document.id %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-download"></i> Export to Excel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

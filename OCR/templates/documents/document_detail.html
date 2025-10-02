@@ -64,16 +64,32 @@
                 </p>
             </div>
             <div class="col-md-4 text-end">
-                <div class="btn-group" role="group">
+                <div class="btn-group mb-2" role="group">
                     <a href="{% url 'documents:document_edit' document.id %}" class="btn btn-light">
                         <i class="fas fa-edit me-2"></i>Edit
                     </a>
-                    <a href="{% url 'documents:document_export' document.id %}" class="btn btn-success">
-                        <i class="fas fa-download me-2"></i>Export
+                    {% if document.excel_file %}
+                    <a href="{% url 'documents:document_download_excel' document.id %}" class="btn btn-success">
+                        <i class="fas fa-file-excel me-2"></i>Excel
                     </a>
+                    {% endif %}
                     <button type="button" class="btn btn-danger" onclick="confirmDelete()">
                         <i class="fas fa-trash me-2"></i>Delete
                     </button>
+                </div>
+                <div class="btn-group d-block" role="group">
+                    <a href="{% url 'documents:document_export_excel' document.id %}" class="btn btn-success btn-sm">
+                        <i class="fas fa-file-excel me-1"></i>Excel
+                    </a>
+                    <a href="{% url 'documents:document_export_docx' document.id %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-file-word me-1"></i>Word
+                    </a>
+                    <a href="{% url 'documents:document_export_csv' document.id %}" class="btn btn-info btn-sm">
+                        <i class="fas fa-file-csv me-1"></i>CSV
+                    </a>
+                    <a href="{% url 'documents:document_export' document.id %}" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-file-alt me-1"></i>Text
+                    </a>
                 </div>
             </div>
         </div>
