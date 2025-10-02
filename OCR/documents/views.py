@@ -163,7 +163,22 @@ def document_upload_with_template(request, template_id):
                         
                         excel_file_path = os.path.join('documents', 'excel', output_excel_name)
                 else:
+                    # No table detected in document - use fallback extraction
                     messages.warning(request, 'No table structure detected in document. Using fallback extraction.')
+                    from ocr_processing.ocr_core import TemplateProcessor
+                    template_processor = TemplateProcessor(ocr_engine)
+                    extracted_fields = template_processor.process_document_with_template(
+                        full_path, template.structure or {}
+                    )
+                    extracted_data = {
+                        'fields': [
+                            {
+                                'name': field.name,
+                                'value': field.value,
+                                'confidence': field.confidence
+                            } for field in extracted_fields
+                        ]
+                    }
             
             else:
                 # Fallback to old template processor
@@ -284,6 +299,7 @@ def document_reprocess(request, document_id):
     if request.method == 'POST':
         try:
             from ocr_processing.ocr_core import OCREngine, TemplateProcessor
+            from ocr_processing.table_detector import TableDetector
             from django.conf import settings
             import os
             
@@ -294,22 +310,54 @@ def document_reprocess(request, document_id):
             ocr_engine = OCREngine()
             
             if document.template:
-                # Reprocess with template
-                template_processor = TemplateProcessor(ocr_engine)
-                extracted_fields = template_processor.process_document_with_template(
-                    full_path, document.template.structure or {}
+                # Check if template has table structure (new detection method)
+                has_table_structure = (
+                    document.template.structure and 
+                    ('headers' in document.template.structure or 'cells' in document.template.structure)
                 )
                 
-                document.extracted_data = {
-                    'fields': [
-                        {
-                            'name': field.name,
-                            'value': field.value,
-                            'confidence': field.confidence
-                        } for field in extracted_fields
-                    ]
-                }
-                messages.success(request, f'Document reprocessed with template. Extracted {len(extracted_fields)} fields.')
+                if has_table_structure:
+                    # Use table detection for processing
+                    table_detector = TableDetector(ocr_engine)
+                    table_structure = table_detector.detect_table_structure(full_path, method="morphology")
+                    
+                    if table_structure:
+                        document.extracted_data = table_detector.structure_to_dict(table_structure)
+                        cell_count = len(document.extracted_data.get('cells', []))
+                        messages.success(request, f'Document reprocessed with table detection. Extracted {cell_count} cells.')
+                    else:
+                        # No table detected - use fallback
+                        messages.warning(request, 'No table structure detected. Using fallback extraction.')
+                        template_processor = TemplateProcessor(ocr_engine)
+                        extracted_fields = template_processor.process_document_with_template(
+                            full_path, document.template.structure or {}
+                        )
+                        document.extracted_data = {
+                            'fields': [
+                                {
+                                    'name': field.name,
+                                    'value': field.value,
+                                    'confidence': field.confidence
+                                } for field in extracted_fields
+                            ]
+                        }
+                        messages.success(request, f'Document reprocessed with template. Extracted {len(extracted_fields)} fields.')
+                else:
+                    # Old template format - use template processor
+                    template_processor = TemplateProcessor(ocr_engine)
+                    extracted_fields = template_processor.process_document_with_template(
+                        full_path, document.template.structure or {}
+                    )
+                    document.extracted_data = {
+                        'fields': [
+                            {
+                                'name': field.name,
+                                'value': field.value,
+                                'confidence': field.confidence
+                            } for field in extracted_fields
+                        ]
+                    }
+                    messages.success(request, f'Document reprocessed with template. Extracted {len(extracted_fields)} fields.')
             else:
                 # General OCR reprocessing
                 ocr_result = ocr_engine.extract_text(full_path)
@@ -326,6 +374,8 @@ def document_reprocess(request, document_id):
             return redirect('documents:document_detail', document_id=document_id)
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             messages.error(request, f'Error reprocessing document: {str(e)}')
             return redirect('documents:document_detail', document_id=document_id)
     
@@ -635,7 +685,7 @@ def document_export_excel(request, document_id):
 
 
 def document_export_docx(request, document_id):
-    """Export a single document's data to Word (DOCX) with custom filename"""
+    """Export a single document's data to Word (.docx) with custom filename"""
     document = get_object_or_404(Document, id=document_id)
     
     if request.method == 'POST':
@@ -658,24 +708,23 @@ def document_export_docx(request, document_id):
             os.makedirs(output_dir, exist_ok=True)
             output_path = os.path.join(output_dir, custom_filename)
             
-            # Create DOCX file
+            # Create Word document
             docx_exporter = DocxExporter()
             
             if document.template:
-                # Create structured DOCX from template data
+                # Export structured template data
                 docx_path = docx_exporter.export_template_data_to_docx(
-                    document.extracted_data,
+                    document,
                     document.template,
-                    output_path,
-                    title=document.name
+                    output_path
                 )
             else:
-                # Create plain text DOCX
-                text = document.extracted_data.get('text', '') if document.extracted_data else ''
+                # Export plain text
+                text = document.extracted_data.get('text', 'No text extracted')
                 metadata = {
                     'Document': document.name,
                     'Processed': document.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                    'Confidence': f"{document.confidence_score:.1f}%" if document.confidence_score else "N/A"
+                    'Confidence': f"{document.confidence_score:.1f}%" if document.confidence_score else 'N/A'
                 }
                 docx_path = docx_exporter.export_plain_text_to_docx(
                     text,
@@ -703,8 +752,126 @@ def document_export_docx(request, document_id):
     return render(request, 'documents/document_export_docx_form.html', {'document': document})
 
 
+def document_export_csv(request, document_id):
+    """Export a single document to CSV format"""
+    import csv
+    from io import StringIO
+    
+    document = get_object_or_404(Document, id=document_id)
+    
+    # Create CSV content
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    if document.template:
+        # Template-based export
+        field_names = document.template.get_field_names()
+        
+        # Write header
+        writer.writerow(field_names)
+        
+        # Write data
+        extracted_data = document.extracted_data
+        if 'fields' in extracted_data:
+            values = [field.get('value', '') for field in extracted_data['fields']]
+            writer.writerow(values)
+        elif 'cells' in extracted_data:
+            # Table format - extract first data row
+            cells = extracted_data['cells']
+            row_data = {}
+            for cell_data in cells:
+                row = cell_data.get('row', 0)
+                col = cell_data.get('col', 0)
+                text = cell_data.get('text', '')
+                if row == 1:  # First data row after header
+                    row_data[col] = text
+            
+            values = [row_data.get(i, '') for i in range(len(field_names))]
+            writer.writerow(values)
+    else:
+        # General text export - just document info
+        writer.writerow(['Document', 'Extracted Text', 'Confidence'])
+        text = document.extracted_data.get('text', '') if document.extracted_data else ''
+        confidence = document.confidence_score if document.confidence_score else 'N/A'
+        writer.writerow([document.name, text, confidence])
+    
+    # Create response
+    response = HttpResponse(output.getvalue(), content_type='text/csv')
+    filename = f"{document.name}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
+
+
+def template_export_all_documents_csv(request, template_id):
+    """Export all documents for a template to CSV format"""
+    import csv
+    from io import StringIO
+    
+    template = get_object_or_404(Template, id=template_id)
+    documents = Document.objects.filter(template=template, processing_status='completed')
+    
+    if not documents.exists():
+        messages.error(request, 'No processed documents found for this template')
+        return redirect('templates:template_detail', template_id=template_id)
+    
+    # Create CSV content
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # Get field names from template
+    field_names = template.get_field_names()
+    
+    # Write header
+    header = ['Document Name', 'Processed Date'] + field_names + ['Confidence']
+    writer.writerow(header)
+    
+    # Write data rows
+    for document in documents:
+        row = [
+            document.name,
+            document.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        ]
+        
+        extracted_data = document.extracted_data
+        
+        if 'fields' in extracted_data:
+            # Template-based format
+            for field in extracted_data['fields']:
+                row.append(field.get('value', ''))
+        elif 'cells' in extracted_data:
+            # Table format - extract first data row
+            cells = extracted_data['cells']
+            row_data = {}
+            for cell_data in cells:
+                cell_row = cell_data.get('row', 0)
+                col = cell_data.get('col', 0)
+                text = cell_data.get('text', '')
+                if cell_row == 1:  # First data row after header
+                    row_data[col] = text
+            
+            for i in range(len(field_names)):
+                row.append(row_data.get(i, ''))
+        else:
+            # Fill empty values
+            row.extend([''] * len(field_names))
+        
+        # Add confidence
+        confidence = f"{document.confidence_score:.1f}%" if document.confidence_score else 'N/A'
+        row.append(confidence)
+        
+        writer.writerow(row)
+    
+    # Create response
+    response = HttpResponse(output.getvalue(), content_type='text/csv')
+    filename = f"{template.name}_export.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
+
+
 def template_export_all_documents_docx(request, template_id):
-    """Export all documents for a template into a single Word (DOCX) file"""
+    """Export all documents for a template into a single Word file"""
     template = get_object_or_404(Template, id=template_id)
     
     if request.method == 'POST':
@@ -734,13 +901,12 @@ def template_export_all_documents_docx(request, template_id):
             os.makedirs(output_dir, exist_ok=True)
             output_path = os.path.join(output_dir, custom_filename)
             
-            # Create consolidated DOCX
+            # Create consolidated Word document
             docx_exporter = DocxExporter()
-            docx_path = docx_exporter.export_multi_documents_to_docx(
-                documents, 
-                template, 
-                output_path,
-                custom_filename.replace('.docx', '')
+            docx_path = docx_exporter.export_multiple_documents_to_docx(
+                documents,
+                template,
+                output_path
             )
             
             # Return file as download
@@ -755,7 +921,7 @@ def template_export_all_documents_docx(request, template_id):
         except Exception as e:
             import traceback
             traceback.print_exc()
-            messages.error(request, f'Error exporting documents: {str(e)}')
+            messages.error(request, f'Error exporting documents to Word: {str(e)}')
             return redirect('templates:template_detail', template_id=template_id)
     
     # GET request - show export form
@@ -767,132 +933,132 @@ def template_export_all_documents_docx(request, template_id):
     return render(request, 'documents/template_export_docx_form.html', context)
 
 
-def document_export_csv(request, document_id):
-    """Export a single document's data to CSV"""
+def document_export_pdf(request, document_id):
+    """Export a single document's data to PDF with custom filename"""
     document = get_object_or_404(Document, id=document_id)
     
-    try:
-        import csv
-        from io import StringIO
-        
-        # Create CSV in memory
-        output = StringIO()
-        writer = csv.writer(output)
-        
-        if document.template:
-            # Get field names from template
-            field_names = document.template.get_field_names() if hasattr(document.template, 'get_field_names') else []
+    if request.method == 'POST':
+        try:
+            from ocr_processing.pdf_filler import PDFFiller
+            from django.conf import settings
+            from datetime import datetime
+            import os
             
-            if field_names:
-                # Write header row
-                writer.writerow(field_names)
+            # Get custom filename from user
+            custom_filename = request.POST.get('export_filename', '')
+            if not custom_filename:
+                custom_filename = f"{document.name}_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            
+            if not custom_filename.endswith('.pdf'):
+                custom_filename += '.pdf'
+            
+            # Create output path
+            output_dir = os.path.join(settings.MEDIA_ROOT, 'exports')
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, custom_filename)
+            
+            # Create PDF
+            pdf_filler = PDFFiller()
+            
+            if document.template:
+                # Export structured template data as PDF
+                pdf_path = pdf_filler.create_pdf_from_template_data(
+                    document,
+                    document.template,
+                    output_path
+                )
+            else:
+                # Export plain text as PDF
+                text = document.extracted_data.get('text', 'No text extracted')
+                metadata = {
+                    'Document': document.name,
+                    'Processed': document.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    'Confidence': f"{document.confidence_score:.1f}%" if document.confidence_score else 'N/A'
+                }
+                pdf_path = pdf_filler.create_pdf_from_text(
+                    text,
+                    output_path,
+                    title=document.name,
+                    metadata=metadata
+                )
+            
+            # Return file as download
+            with open(pdf_path, 'rb') as pdf_file:
+                response = HttpResponse(
+                    pdf_file.read(),
+                    content_type='application/pdf'
+                )
+                response['Content-Disposition'] = f'attachment; filename="{custom_filename}"'
+                return response
                 
-                # Write data row
-                extracted_data = document.extracted_data
-                values = []
-                
-                if 'fields' in extracted_data:
-                    # Template-based format
-                    for field in extracted_data['fields']:
-                        values.append(field.get('value', ''))
-                
-                elif 'cells' in extracted_data:
-                    # Table detection format - extract first data row
-                    cells = extracted_data['cells']
-                    row_data = {}
-                    for cell in cells:
-                        row = cell.get('row', 0)
-                        col = cell.get('col', 0)
-                        if row == 1:  # First data row
-                            row_data[col] = cell.get('text', '')
-                    
-                    for col_idx in sorted(row_data.keys()):
-                        values.append(row_data[col_idx])
-                
-                writer.writerow(values)
-        
-        else:
-            # General text document - export as single cell
-            writer.writerow(['Extracted Text'])
-            text = document.extracted_data.get('text', '') if document.extracted_data else ''
-            writer.writerow([text])
-        
-        # Create response
-        filename = f"{document.name.replace('.', '_')}_export.csv"
-        response = HttpResponse(output.getvalue(), content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        return response
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        messages.error(request, f'Error exporting to CSV: {str(e)}')
-        return redirect('documents:document_detail', document_id=document_id)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            messages.error(request, f'Error exporting to PDF: {str(e)}')
+            return redirect('documents:document_detail', document_id=document_id)
+    
+    # GET request - show export form
+    return render(request, 'documents/document_export_pdf_form.html', {'document': document})
 
 
-def template_export_all_documents_csv(request, template_id):
-    """Export all documents for a template into a single CSV file"""
+def template_export_all_documents_pdf(request, template_id):
+    """Export all documents for a template into a single PDF file"""
     template = get_object_or_404(Template, id=template_id)
     
-    try:
-        import csv
-        from io import StringIO
-        from datetime import datetime
-        
-        # Get all documents for this template
-        documents = Document.objects.filter(template=template, processing_status='completed')
-        
-        if not documents.exists():
-            messages.error(request, 'No processed documents found for this template')
-            return redirect('templates:template_detail', template_id=template_id)
-        
-        # Create CSV in memory
-        output = StringIO()
-        writer = csv.writer(output)
-        
-        # Get field names from template
-        field_names = template.get_field_names() if hasattr(template, 'get_field_names') else []
-        
-        if field_names:
-            # Write header row (with Document column)
-            headers = ['Document'] + field_names
-            writer.writerow(headers)
+    if request.method == 'POST':
+        try:
+            from ocr_processing.pdf_filler import PDFFiller
+            from django.conf import settings
+            import os
+            from datetime import datetime
             
-            # Write data for each document
-            for doc_idx, document in enumerate(documents, start=1):
-                row = [f"Doc_{doc_idx}"]
-                extracted_data = document.extracted_data
+            # Get custom filename from user
+            custom_filename = request.POST.get('export_filename', '')
+            if not custom_filename:
+                custom_filename = f"{template.name}_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            
+            if not custom_filename.endswith('.pdf'):
+                custom_filename += '.pdf'
+            
+            # Get all documents for this template
+            documents = Document.objects.filter(template=template, processing_status='completed')
+            
+            if not documents.exists():
+                messages.error(request, 'No processed documents found for this template')
+                return redirect('templates:template_detail', template_id=template_id)
+            
+            # Create output path
+            output_dir = os.path.join(settings.MEDIA_ROOT, 'exports')
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, custom_filename)
+            
+            # Create consolidated PDF
+            pdf_filler = PDFFiller()
+            pdf_path = pdf_filler.create_consolidated_pdf(
+                documents,
+                template,
+                output_path
+            )
+            
+            # Return file as download
+            with open(pdf_path, 'rb') as pdf_file:
+                response = HttpResponse(
+                    pdf_file.read(),
+                    content_type='application/pdf'
+                )
+                response['Content-Disposition'] = f'attachment; filename="{custom_filename}"'
+                return response
                 
-                if 'fields' in extracted_data:
-                    # Template-based format
-                    for field in extracted_data['fields']:
-                        row.append(field.get('value', ''))
-                
-                elif 'cells' in extracted_data:
-                    # Table detection format
-                    cells = extracted_data['cells']
-                    row_data = {}
-                    for cell in cells:
-                        cell_row = cell.get('row', 0)
-                        col = cell.get('col', 0)
-                        if cell_row == 1:  # First data row
-                            row_data[col] = cell.get('text', '')
-                    
-                    for col_idx in sorted(row_data.keys()):
-                        row.append(row_data[col_idx])
-                
-                writer.writerow(row)
-        
-        # Create response
-        filename = f"{template.name.replace(' ', '_')}_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        response = HttpResponse(output.getvalue(), content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        return response
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        messages.error(request, f'Error exporting to CSV: {str(e)}')
-        return redirect('templates:template_detail', template_id=template_id)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            messages.error(request, f'Error exporting documents to PDF: {str(e)}')
+            return redirect('templates:template_detail', template_id=template_id)
+    
+    # GET request - show export form
+    documents = Document.objects.filter(template=template, processing_status='completed')
+    context = {
+        'template': template,
+        'document_count': documents.count()
+    }
+    return render(request, 'documents/template_export_pdf_form.html', context)

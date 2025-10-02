@@ -1,7 +1,7 @@
-{% extends 'base.html' %}
+{% extends 'base/base.html' %}
 {% load static %}
 
-{% block title %}Export All Documents to Word - {{ template.name }}{% endblock %}
+{% block title %}Export All to Word - {{ template.name }}{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -31,38 +31,39 @@
                     </a>
                     {% else %}
                     <p class="mb-4">
-                        This will create a consolidated Word document containing data from all {{ document_count }} 
-                        processed document(s) using this template. Each document will be a row in a formatted table.
+                        This will create a professional Word document containing data from all {{ document_count }} 
+                        processed document(s). The report will include:
                     </p>
+
+                    <div class="alert alert-success">
+                        <h6><i class="bi bi-check-circle"></i> Report Contents:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Summary Table:</strong> Consolidated data from all documents</li>
+                            <li><strong>Individual Details:</strong> Complete breakdown of each document</li>
+                            <li><strong>Professional Formatting:</strong> Tables, headers, and styling</li>
+                            <li><strong>Metadata:</strong> Processing dates, confidence scores</li>
+                            <li><strong>Page Numbers & Footer:</strong> Document information</li>
+                        </ul>
+                    </div>
 
                     <form method="post">
                         {% csrf_token %}
                         
                         <div class="mb-4">
                             <label for="export_filename" class="form-label">
-                                <strong>Word Filename</strong>
+                                <strong>Word Document Filename</strong>
                             </label>
                             <input 
                                 type="text" 
                                 class="form-control" 
                                 id="export_filename" 
                                 name="export_filename" 
-                                placeholder="e.g., consolidated_data" 
-                                value="{{ template.name|slugify }}_export"
+                                placeholder="e.g., consolidated_report" 
+                                value="{{ template.name|slugify }}_report"
                             >
                             <small class="form-text text-muted">
                                 .docx extension will be added automatically
                             </small>
-                        </div>
-
-                        <div class="alert alert-success">
-                            <strong>What's included:</strong>
-                            <ul class="mb-0">
-                                <li>Template summary and metadata</li>
-                                <li>Consolidated table with all document data</li>
-                                <li>Professional formatting ready for editing</li>
-                                <li>Compatible with Microsoft Word, Google Docs, and LibreOffice</li>
-                            </ul>
                         </div>
 
                         <div class="d-flex justify-content-between">
@@ -70,7 +71,7 @@
                                 <i class="bi bi-arrow-left"></i> Cancel
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-download"></i> Export {{ document_count }} Document(s)
+                                <i class="bi bi-download"></i> Export {{ document_count }} Document(s) to Word
                             </button>
                         </div>
                     </form>

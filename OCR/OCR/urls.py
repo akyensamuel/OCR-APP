@@ -20,11 +20,13 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('rest_framework.urls')),
+    path('api/auth/', include('rest_framework.urls')),
+    path('api/v1/', include('api.urls')),
     path('', include('templates.urls')),
     path('documents/', include('documents.urls')),
     path('editor/', include('editor.urls')),
     path('ocr/', include('ocr_processing.urls')),
+    path('search/', include('search.urls')),
 ]
 
 # Serve media files in development

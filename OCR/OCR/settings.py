@@ -39,11 +39,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
+    'django_filters',
     'basemode',
     'ocr_processing',
     'templates',  # Template management app
     'documents',
     'editor',
+    'search',  # Search functionality
+    'api',  # REST API
 ]
 
 MIDDLEWARE = [

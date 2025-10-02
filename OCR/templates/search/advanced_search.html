@@ -1,0 +1,263 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Advanced Search{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-sliders-h me-2"></i>Advanced Search
+            </h2>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Search Filters -->
+        <div class="col-lg-3">
+            <div class="card mb-4 sticky-top" style="top: 20px;">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter me-2"></i>Filters
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" id="advancedSearchForm">
+                        <!-- Text Search -->
+                        <div class="mb-3">
+                            <label class="form-label">Search Query</label>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                name="q" 
+                                value="{{ query }}"
+                                placeholder="Enter keywords..."
+                            >
+                        </div>
+                        
+                        <hr>
+                        
+                        <!-- Template Filter -->
+                        <div class="mb-3">
+                            <label class="form-label">Template</label>
+                            <select class="form-select" name="template">
+                                <option value="">All Templates</option>
+                                {% for template in templates %}
+                                <option value="{{ template.id }}" {% if selected_template == template.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ template.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Confidence Range -->
+                        <div class="mb-3">
+                            <label class="form-label">Confidence Score</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input 
+                                        type="number" 
+                                        class="form-control form-control-sm" 
+                                        name="confidence_min" 
+                                        value="{{ confidence_min }}"
+                                        placeholder="Min"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                    >
+                                </div>
+                                <div class="col-6">
+                                    <input 
+                                        type="number" 
+                                        class="form-control form-control-sm" 
+                                        name="confidence_max" 
+                                        value="{{ confidence_max }}"
+                                        placeholder="Max"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Date Range -->
+                        <div class="mb-3">
+                            <label class="form-label">Date Range</label>
+                            <div class="mb-2">
+                                <input 
+                                    type="date" 
+                                    class="form-control form-control-sm" 
+                                    name="date_from" 
+                                    value="{{ date_from }}"
+                                    placeholder="From"
+                                >
+                            </div>
+                            <div>
+                                <input 
+                                    type="date" 
+                                    class="form-control form-control-sm" 
+                                    name="date_to" 
+                                    value="{{ date_to }}"
+                                    placeholder="To"
+                                >
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search me-2"></i>Search
+                            </button>
+                            <a href="{% url 'search:advanced_search' %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-times me-2"></i>Clear Filters
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Search Results -->
+        <div class="col-lg-9">
+            {% if document_count is not None %}
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4>
+                    Results
+                    <span class="badge bg-primary">{{ document_count }}</span>
+                </h4>
+                
+                {% if query %}
+                <div class="text-muted">
+                    Searching for: <strong>{{ query }}</strong>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if document_count == 0 %}
+            <div class="text-center py-5">
+                <i class="fas fa-search fa-4x text-muted mb-3"></i>
+                <h5>No documents found</h5>
+                <p class="text-muted">Try adjusting your filters or search terms</p>
+            </div>
+            {% else %}
+            
+            <!-- Results List -->
+            <div class="row">
+                {% for document in documents %}
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <a href="{% url 'documents:document_detail' document.id %}" class="text-decoration-none">
+                                    {{ document.name }}
+                                </a>
+                            </h5>
+                            
+                            <div class="d-flex gap-2 mb-2 flex-wrap">
+                                {% if document.template %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-th-large me-1"></i>{{ document.template.name }}
+                                </span>
+                                {% endif %}
+                                
+                                {% if document.confidence_score %}
+                                <span class="badge bg-{% if document.confidence_score >= 90 %}success{% elif document.confidence_score >= 70 %}info{% else %}warning{% endif %}">
+                                    <i class="fas fa-check-circle me-1"></i>{{ document.confidence_score|floatformat:1 }}%
+                                </span>
+                                {% endif %}
+                            </div>
+                            
+                            {% if document.text_content %}
+                            <p class="card-text text-muted small">
+                                {{ document.text_content|truncatewords:25 }}
+                            </p>
+                            {% endif %}
+                            
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-1"></i>
+                                    {{ document.created_at|date:"M d, Y H:i" }}
+                                </small>
+                                <a href="{% url 'documents:document_detail' document.id %}" class="btn btn-sm btn-outline-primary">
+                                    View
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Pagination -->
+            {% if documents.has_other_pages %}
+            <nav aria-label="Search results pagination" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if documents.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?q={{ query }}&template={{ selected_template }}&confidence_min={{ confidence_min }}&confidence_max={{ confidence_max }}&date_from={{ date_from }}&date_to={{ date_to }}&page={{ documents.previous_page_number }}">
+                            Previous
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ documents.number }} of {{ documents.paginator.num_pages }}
+                        </span>
+                    </li>
+                    
+                    {% if documents.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?q={{ query }}&template={{ selected_template }}&confidence_min={{ confidence_min }}&confidence_max={{ confidence_max }}&date_from={{ date_from }}&date_to={{ date_to }}&page={{ documents.next_page_number }}">
+                            Next
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            
+            {% endif %}
+            {% else %}
+            <!-- Initial State -->
+            <div class="text-center py-5">
+                <i class="fas fa-sliders-h fa-4x text-muted mb-3"></i>
+                <h4>Advanced Search</h4>
+                <p class="text-muted">Use the filters on the left to find exactly what you're looking for</p>
+                
+                <div class="row mt-5">
+                    <div class="col-md-6 mx-auto">
+                        <div class="card">
+                            <div class="card-body text-start">
+                                <h6 class="mb-3">Available Filters:</h6>
+                                <ul class="list-unstyled">
+                                    <li class="mb-2">
+                                        <i class="fas fa-search text-primary me-2"></i>
+                                        <strong>Text Search:</strong> Search by document name or content
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-th-large text-success me-2"></i>
+                                        <strong>Template:</strong> Filter by specific template
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-percentage text-info me-2"></i>
+                                        <strong>Confidence Score:</strong> Set min/max confidence range
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-calendar text-warning me-2"></i>
+                                        <strong>Date Range:</strong> Filter by upload date
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

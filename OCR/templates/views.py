@@ -391,6 +391,7 @@ def process_template(request, template_id):
             
             # Process document using template structure
             from ocr_processing.ocr_core import OCREngine, TemplateProcessor
+            from ocr_processing.table_detector import TableDetector
             from documents.models import Document
             import os
             from django.conf import settings
@@ -403,16 +404,6 @@ def process_template(request, template_id):
             )
             full_path = os.path.join(settings.MEDIA_ROOT, file_path)
             
-            # Initialize OCR and process document
-            ocr_engine = OCREngine()
-            template_processor = TemplateProcessor(ocr_engine)
-            
-            # Extract data using template structure
-            extracted_fields = template_processor.process_document_with_template(
-                full_path, template.structure or {}
-            )
-            
-            # Create Document record
             # Get current user or create a default user if not authenticated
             if request.user.is_authenticated:
                 uploaded_by = request.user
@@ -428,12 +419,49 @@ def process_template(request, template_id):
                     }
                 )
             
-            document = Document.objects.create(
-                name=uploaded_file.name,
-                file=file_path,
-                template=template,
-                uploaded_by=uploaded_by,
-                extracted_data={
+            # Initialize OCR and process document
+            ocr_engine = OCREngine()
+            
+            # Check if template has table structure (new detection method)
+            has_table_structure = (
+                template.structure and 
+                ('headers' in template.structure or 'cells' in template.structure)
+            )
+            
+            extracted_data = {}
+            
+            if has_table_structure:
+                # Use table detection for processing
+                table_detector = TableDetector(ocr_engine)
+                table_structure = table_detector.detect_table_structure(full_path, method="morphology")
+                
+                if table_structure:
+                    extracted_data = table_detector.structure_to_dict(table_structure)
+                    cell_count = len(extracted_data.get('cells', []))
+                    success_message = f'Document processed successfully. Extracted {cell_count} cells from table.'
+                else:
+                    # No table detected - use fallback
+                    template_processor = TemplateProcessor(ocr_engine)
+                    extracted_fields = template_processor.process_document_with_template(
+                        full_path, template.structure or {}
+                    )
+                    extracted_data = {
+                        'fields': [
+                            {
+                                'name': field.name,
+                                'value': field.value,
+                                'confidence': field.confidence
+                            } for field in extracted_fields
+                        ]
+                    }
+                    success_message = f'Document processed successfully. Extracted {len(extracted_fields)} fields (fallback method).'
+            else:
+                # Old template format - use template processor
+                template_processor = TemplateProcessor(ocr_engine)
+                extracted_fields = template_processor.process_document_with_template(
+                    full_path, template.structure or {}
+                )
+                extracted_data = {
                     'fields': [
                         {
                             'name': field.name,
@@ -441,17 +469,28 @@ def process_template(request, template_id):
                             'confidence': field.confidence
                         } for field in extracted_fields
                     ]
-                },
+                }
+                success_message = f'Document processed successfully. Extracted {len(extracted_fields)} fields.'
+            
+            # Create Document record
+            document = Document.objects.create(
+                name=uploaded_file.name,
+                file=file_path,
+                template=template,
+                uploaded_by=uploaded_by,
+                extracted_data=extracted_data,
                 processing_status='completed'
             )
             
             return JsonResponse({
                 'success': True,
-                'message': f'Document processed successfully. Extracted {len(extracted_fields)} fields.',
+                'message': success_message,
                 'redirect_url': f'/documents/{document.pk}/'
             })
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return JsonResponse({
                 'success': False,
                 'message': f'Error processing document: {str(e)}'

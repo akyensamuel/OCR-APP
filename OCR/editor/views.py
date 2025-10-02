@@ -91,13 +91,6 @@ def export_text_document(request, document_id):
     """Export document as text file"""
     document = get_object_or_404(TextDocument, id=document_id)
     
-    # Check for format parameter
-    export_format = request.GET.get('format', 'txt')
-    
-    if export_format == 'docx':
-        return export_text_document_docx(request, document_id)
-    
-    # Default to text export
     response = HttpResponse(document.extracted_text, content_type='text/plain')
     response['Content-Disposition'] = f'attachment; filename="{document.title}.txt"'
     
@@ -105,29 +98,29 @@ def export_text_document(request, document_id):
 
 
 def export_text_document_docx(request, document_id):
-    """Export text document as Word (DOCX) file"""
+    """Export document as Word (.docx) file"""
     document = get_object_or_404(TextDocument, id=document_id)
     
     try:
         from ocr_processing.docx_exporter import DocxExporter
-        from datetime import datetime
+        import os
         import tempfile
         
         # Create temporary file
-        temp_dir = tempfile.gettempdir()
-        filename = f"{document.title.replace('.', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-        output_path = os.path.join(temp_dir, filename)
+        temp_dir = tempfile.mkdtemp()
+        output_filename = f"{document.title}.docx"
+        output_path = os.path.join(temp_dir, output_filename)
         
-        # Prepare metadata
+        # Create metadata
         metadata = {
-            'Document Title': document.title,
-            'Processed Date': document.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'Confidence Score': f"{document.confidence_score:.1f}%" if document.confidence_score else "N/A",
-            'Word Count': str(document.word_count),
-            'Character Count': str(document.char_count)
+            'Document': document.title,
+            'Processed': document.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'Word Count': document.word_count,
+            'Character Count': document.char_count,
+            'Confidence': f"{document.confidence_score:.1f}%" if document.confidence_score else 'N/A'
         }
         
-        # Create DOCX
+        # Export to Word
         docx_exporter = DocxExporter()
         docx_path = docx_exporter.export_plain_text_to_docx(
             document.extracted_text,
@@ -136,17 +129,18 @@ def export_text_document_docx(request, document_id):
             metadata=metadata
         )
         
-        # Return file as download
+        # Return file
         with open(docx_path, 'rb') as docx_file:
             response = HttpResponse(
                 docx_file.read(),
                 content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             )
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            
-        # Clean up temp file
+            response['Content-Disposition'] = f'attachment; filename="{output_filename}"'
+        
+        # Cleanup temp file
         try:
             os.remove(docx_path)
+            os.rmdir(temp_dir)
         except:
             pass
         
@@ -156,6 +150,62 @@ def export_text_document_docx(request, document_id):
         import traceback
         traceback.print_exc()
         messages.error(request, f'Error exporting to Word: {str(e)}')
+        return redirect('editor:edit_text_document', document_id=document_id)
+
+
+def export_text_document_pdf(request, document_id):
+    """Export document as PDF file"""
+    document = get_object_or_404(TextDocument, id=document_id)
+    
+    try:
+        from ocr_processing.pdf_filler import PDFFiller
+        import os
+        import tempfile
+        
+        # Create temporary file
+        temp_dir = tempfile.mkdtemp()
+        output_filename = f"{document.title}.pdf"
+        output_path = os.path.join(temp_dir, output_filename)
+        
+        # Create metadata
+        metadata = {
+            'Document': document.title,
+            'Processed': document.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'Word Count': document.word_count,
+            'Character Count': document.char_count,
+            'Confidence': f"{document.confidence_score:.1f}%" if document.confidence_score else 'N/A'
+        }
+        
+        # Export to PDF
+        pdf_filler = PDFFiller()
+        pdf_path = pdf_filler.create_pdf_from_text(
+            document.extracted_text,
+            output_path,
+            title=document.title,
+            metadata=metadata
+        )
+        
+        # Return file
+        with open(pdf_path, 'rb') as pdf_file:
+            response = HttpResponse(
+                pdf_file.read(),
+                content_type='application/pdf'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{output_filename}"'
+        
+        # Cleanup temp file
+        try:
+            os.remove(pdf_path)
+            os.rmdir(temp_dir)
+        except:
+            pass
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        messages.error(request, f'Error exporting to PDF: {str(e)}')
         return redirect('editor:edit_text_document', document_id=document_id)
 
 

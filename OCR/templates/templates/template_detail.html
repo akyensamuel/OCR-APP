@@ -25,11 +25,30 @@
                 </h2>
                 <p class="text-muted mb-0">{{ template.description|default:"No description provided" }}</p>
             </div>
-            <div class="btn-group mb-2" role="group">
+            <div class="btn-group" role="group">
                 <a href="{% url 'templates:template_edit' template.id %}" class="btn btn-outline-primary">
                     <i class="fas fa-edit me-2"></i>
                     Edit
                 </a>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="fas fa-download me-2"></i>Export All
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{% url 'documents:template_export_all' template.id %}">
+                            <i class="fas fa-file-excel me-2"></i>Excel (.xlsx)
+                        </a></li>
+                        <li><a class="dropdown-item" href="{% url 'documents:template_export_all_docx' template.id %}">
+                            <i class="fas fa-file-word me-2"></i>Word (.docx)
+                        </a></li>
+                        <li><a class="dropdown-item" href="{% url 'documents:template_export_all_csv' template.id %}">
+                            <i class="fas fa-file-csv me-2"></i>CSV (.csv)
+                        </a></li>
+                        <li><a class="dropdown-item" href="{% url 'documents:template_export_all_pdf' template.id %}">
+                            <i class="fas fa-file-pdf me-2"></i>PDF (.pdf)
+                        </a></li>
+                    </ul>
+                </div>
                 <a href="{% url 'templates:process_template' template.id %}" class="btn btn-info">
                     <i class="fas fa-cogs me-2"></i>
                     Use Template
@@ -45,20 +64,6 @@
                     <i class="fas fa-trash me-2"></i>
                     Delete
                 </button>
-            </div>
-            <div class="btn-group d-block" role="group">
-                <a href="{% url 'documents:template_export_all' template.id %}" class="btn btn-success btn-sm">
-                    <i class="fas fa-file-excel me-1"></i>
-                    Excel
-                </a>
-                <a href="{% url 'documents:template_export_all_docx' template.id %}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-file-word me-1"></i>
-                    Word
-                </a>
-                <a href="{% url 'documents:template_export_all_csv' template.id %}" class="btn btn-info btn-sm">
-                    <i class="fas fa-file-csv me-1"></i>
-                    CSV
-                </a>
             </div>
         </div>
     </div>

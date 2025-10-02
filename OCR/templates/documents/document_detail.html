@@ -64,7 +64,7 @@
                 </p>
             </div>
             <div class="col-md-4 text-end">
-                <div class="btn-group mb-2" role="group">
+                <div class="btn-group" role="group">
                     <a href="{% url 'documents:document_edit' document.id %}" class="btn btn-light">
                         <i class="fas fa-edit me-2"></i>Edit
                     </a>
@@ -73,23 +73,24 @@
                         <i class="fas fa-file-excel me-2"></i>Excel
                     </a>
                     {% endif %}
+                    <a href="{% url 'documents:document_export_excel' document.id %}" class="btn btn-info">
+                        <i class="fas fa-table me-2"></i>Excel
+                    </a>
+                    <a href="{% url 'documents:document_export_docx' document.id %}" class="btn btn-primary">
+                        <i class="fas fa-file-word me-2"></i>Word
+                    </a>
+                    <a href="{% url 'documents:document_export_csv' document.id %}" class="btn btn-success">
+                        <i class="fas fa-file-csv me-2"></i>CSV
+                    </a>
+                    <a href="{% url 'documents:document_export_pdf' document.id %}" class="btn btn-danger">
+                        <i class="fas fa-file-pdf me-2"></i>PDF
+                    </a>
+                    <a href="{% url 'documents:document_export' document.id %}" class="btn btn-secondary">
+                        <i class="fas fa-file-alt me-2"></i>Text
+                    </a>
                     <button type="button" class="btn btn-danger" onclick="confirmDelete()">
                         <i class="fas fa-trash me-2"></i>Delete
                     </button>
-                </div>
-                <div class="btn-group d-block" role="group">
-                    <a href="{% url 'documents:document_export_excel' document.id %}" class="btn btn-success btn-sm">
-                        <i class="fas fa-file-excel me-1"></i>Excel
-                    </a>
-                    <a href="{% url 'documents:document_export_docx' document.id %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-file-word me-1"></i>Word
-                    </a>
-                    <a href="{% url 'documents:document_export_csv' document.id %}" class="btn btn-info btn-sm">
-                        <i class="fas fa-file-csv me-1"></i>CSV
-                    </a>
-                    <a href="{% url 'documents:document_export' document.id %}" class="btn btn-secondary btn-sm">
-                        <i class="fas fa-file-alt me-1"></i>Text
-                    </a>
                 </div>
             </div>
         </div>
@@ -124,13 +125,60 @@
                         <i class="fas fa-database me-2"></i>Extracted Data
                     </h5>
                     <span class="badge bg-primary">
-                        {% if document.template %}{{ document.extracted_data.fields|length }} fields
-                        {% else %}Plain Text{% endif %}
+                        {% if document.extracted_data.cells %}
+                            {{ document.extracted_data.cells|length }} cells
+                        {% elif document.extracted_data.fields %}
+                            {{ document.extracted_data.fields|length }} fields
+                        {% elif document.template %}
+                            0 fields
+                        {% else %}
+                            Plain Text
+                        {% endif %}
                     </span>
                 </div>
                 <div class="card-body">
-                    {% if document.template and document.extracted_data.fields %}
-                        <!-- Template-based extraction -->
+                    {% if document.extracted_data.cells %}
+                        <!-- Table-based extraction (new format) -->
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-table me-2"></i>
+                            Detected table: {{ document.extracted_data.rows }} rows × {{ document.extracted_data.cols }} columns
+                            {% if document.extracted_data.grid_confidence %}
+                                ({{ document.extracted_data.grid_confidence|floatformat:1 }}% confidence)
+                            {% endif %}
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-sm">
+                                <tbody>
+                                    {% for cell in document.extracted_data.cells %}
+                                        {% if cell.col == 0 %}
+                                            {% if not forloop.first %}</tr>{% endif %}
+                                            <tr>
+                                        {% endif %}
+                                        <td class="{% if cell.is_header %}table-primary fw-bold{% endif %} align-middle">
+                                            <div>{{ cell.text|default:"—" }}</div>
+                                            {% if cell.confidence %}
+                                                <small class="text-muted">({{ cell.confidence|floatformat:0 }}%)</small>
+                                            {% endif %}
+                                        </td>
+                                        {% if forloop.last %}</tr>{% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <p class="text-muted mb-2"><strong>Detected Headers:</strong></p>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% if document.extracted_data.field_names %}
+                                    {% for field_name in document.extracted_data.field_names %}
+                                        <span class="badge bg-primary">{{ field_name }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% elif document.template and document.extracted_data.fields %}
+                        <!-- Template-based extraction (old format) -->
                         <div class="row g-3">
                             {% for field in document.extracted_data.fields %}
                             <div class="col-md-6">
@@ -171,6 +219,7 @@
                         <div class="text-center text-muted py-4">
                             <i class="fas fa-inbox fa-3x mb-3"></i>
                             <p>No extracted data available</p>
+                            <p><small class="text-muted">Click "Reprocess Document" to extract data from this image.</small></p>
                         </div>
                     {% endif %}
                 </div>
@@ -258,6 +307,12 @@
                         <a href="{% url 'documents:document_edit' document.id %}" class="btn btn-primary">
                             <i class="fas fa-edit me-2"></i>Edit Data
                         </a>
+                        <form method="post" action="{% url 'documents:document_reprocess' document.id %}" class="mb-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-warning w-100" onclick="return confirm('Reprocess this document? This will re-extract all data using OCR.');">
+                                <i class="fas fa-sync-alt me-2"></i>Reprocess Document
+                            </button>
+                        </form>
                         <a href="{% url 'documents:document_export' document.id %}" class="btn btn-success">
                             <i class="fas fa-download me-2"></i>Export Document
                         </a>

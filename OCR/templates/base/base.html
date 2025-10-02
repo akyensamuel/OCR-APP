@@ -84,6 +84,14 @@
                     </li>
                 </ul>
                 
+                <!-- Search Bar -->
+                <form class="d-flex me-3" method="get" action="{% url 'search:search' %}" role="search">
+                    <input class="form-control form-control-sm me-2" type="search" name="q" placeholder="Search..." aria-label="Search" style="width: 200px;">
+                    <button class="btn btn-outline-light btn-sm" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </form>
+                
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
                         <li class="nav-item dropdown">

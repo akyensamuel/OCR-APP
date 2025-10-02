@@ -1,0 +1,84 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Export All to PDF - {{ template.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-file-earmark-pdf"></i> Export All Documents to PDF
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Template:</strong> {{ template.name }}<br>
+                        <strong>Documents to Export:</strong> {{ document_count }}<br>
+                        <strong>Fields:</strong> {{ template.field_count }}
+                    </div>
+
+                    {% if document_count == 0 %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        No processed documents found for this template.
+                    </div>
+                    <a href="{% url 'templates:template_detail' template.id %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Template
+                    </a>
+                    {% else %}
+                    <p class="mb-4">
+                        This will create a professional PDF report containing data from all {{ document_count }} 
+                        processed document(s). Perfect for printing, archiving, or sharing.
+                    </p>
+
+                    <div class="alert alert-success">
+                        <h6><i class="bi bi-check-circle"></i> PDF Report Contents:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Summary Section:</strong> Overview with document count and template info</li>
+                            <li><strong>Consolidated Data Table:</strong> All documents in a single table view</li>
+                            <li><strong>Individual Details:</strong> Complete breakdown of each document on separate pages</li>
+                            <li><strong>Professional Design:</strong> Headers, tables, and color-coded sections</li>
+                            <li><strong>Print-Ready:</strong> Optimized for both screen viewing and printing</li>
+                        </ul>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="export_filename" class="form-label">
+                                <strong>PDF Filename</strong>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="export_filename" 
+                                name="export_filename" 
+                                placeholder="e.g., consolidated_report" 
+                                value="{{ template.name|slugify }}_report"
+                            >
+                            <small class="form-text text-muted">
+                                .pdf extension will be added automatically
+                            </small>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'templates:template_detail' template.id %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-download"></i> Export {{ document_count }} Document(s) to PDF
+                            </button>
+                        </div>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

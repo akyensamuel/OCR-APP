@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'base/base.html' %}
 {% load static %}
 
 {% block title %}Export to Word - {{ document.name }}{% endblock %}
@@ -10,7 +10,7 @@
             <div class="card shadow">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">
-                        <i class="bi bi-file-earmark-word"></i> Export to Word (DOCX)
+                        <i class="bi bi-file-earmark-word"></i> Export to Word
                     </h4>
                 </div>
                 <div class="card-body">
@@ -28,14 +28,14 @@
                         
                         <div class="mb-4">
                             <label for="export_filename" class="form-label">
-                                <strong>Word Filename</strong>
+                                <strong>Word Document Filename</strong>
                             </label>
                             <input 
                                 type="text" 
                                 class="form-control" 
                                 id="export_filename" 
                                 name="export_filename" 
-                                placeholder="e.g., my_document_export" 
+                                placeholder="e.g., my_document" 
                                 value="{{ document.name|cut:'.jpg'|cut:'.png'|cut:'.pdf' }}_export"
                             >
                             <small class="form-text text-muted">
@@ -44,16 +44,15 @@
                         </div>
 
                         <div class="alert alert-success">
-                            <strong>What's included:</strong>
+                            <h6><i class="bi bi-check-circle"></i> What will be included:</h6>
                             <ul class="mb-0">
-                                <li>Professional formatting with headers and tables</li>
-                                <li>Document metadata (date, confidence score)</li>
+                                <li>Document title and metadata</li>
+                                <li>Extracted data in table format</li>
                                 {% if document.template %}
-                                <li>Structured field data in table format</li>
-                                {% else %}
-                                <li>Full extracted text content</li>
+                                <li>All {{ document.template.field_count }} fields with values</li>
                                 {% endif %}
-                                <li>Editable in Microsoft Word or compatible software</li>
+                                <li>Confidence scores</li>
+                                <li>Professional formatting</li>
                             </ul>
                         </div>
 

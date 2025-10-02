@@ -1,0 +1,312 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Search{% if query %} - {{ query }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .search-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 3rem 0;
+        margin-bottom: 2rem;
+    }
+    
+    .search-box {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+    
+    .search-input {
+        border: none;
+        border-radius: 50px;
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .search-btn {
+        border-radius: 50px;
+        padding: 1rem 2.5rem;
+        font-weight: 600;
+    }
+    
+    .result-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    
+    .result-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
+    
+    .result-card.document {
+        border-left-color: #0d6efd;
+    }
+    
+    .result-card.template {
+        border-left-color: #198754;
+    }
+    
+    .search-tabs {
+        border-bottom: 2px solid #dee2e6;
+        margin-bottom: 2rem;
+    }
+    
+    .search-tab {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        background: none;
+        color: #6c757d;
+        cursor: pointer;
+        font-weight: 500;
+        border-bottom: 3px solid transparent;
+    }
+    
+    .search-tab.active {
+        color: #0d6efd;
+        border-bottom-color: #0d6efd;
+    }
+    
+    .no-results {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    
+    .no-results i {
+        font-size: 4rem;
+        color: #dee2e6;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Search Header -->
+<div class="search-header">
+    <div class="container">
+        <h1 class="text-center mb-4">
+            <i class="fas fa-search me-3"></i>Search
+        </h1>
+        
+        <div class="search-box">
+            <form method="get" action="{% url 'search:search' %}">
+                <div class="input-group input-group-lg">
+                    <input 
+                        type="text" 
+                        class="form-control search-input" 
+                        name="q" 
+                        value="{{ query }}"
+                        placeholder="Search documents, templates, or content..."
+                        autofocus
+                    >
+                    <input type="hidden" name="type" value="{{ search_type }}">
+                    <button class="btn btn-light search-btn" type="submit">
+                        <i class="fas fa-search me-2"></i>Search
+                    </button>
+                </div>
+            </form>
+            
+            <div class="text-center mt-3">
+                <a href="{% url 'search:advanced_search' %}" class="text-white text-decoration-none">
+                    <i class="fas fa-sliders-h me-2"></i>Advanced Search
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    {% if query %}
+    <!-- Results Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>
+            Search Results for "{{ query }}"
+            <span class="badge bg-primary">{{ total_results }} result{{ total_results|pluralize }}</span>
+        </h3>
+    </div>
+    
+    <!-- Search Type Tabs -->
+    <div class="search-tabs">
+        <button class="search-tab {% if search_type == 'all' %}active{% endif %}" 
+                onclick="window.location.href='?q={{ query }}&type=all'">
+            All Results ({{ total_results }})
+        </button>
+        <button class="search-tab {% if search_type == 'documents' %}active{% endif %}"
+                onclick="window.location.href='?q={{ query }}&type=documents'">
+            Documents ({{ document_count|default:0 }})
+        </button>
+        <button class="search-tab {% if search_type == 'templates' %}active{% endif %}"
+                onclick="window.location.href='?q={{ query }}&type=templates'">
+            Templates ({{ template_count|default:0 }})
+        </button>
+    </div>
+    
+    {% if total_results == 0 %}
+    <!-- No Results -->
+    <div class="no-results">
+        <i class="fas fa-search"></i>
+        <h4>No results found</h4>
+        <p class="text-muted">Try different keywords or use advanced search</p>
+        <a href="{% url 'search:advanced_search' %}" class="btn btn-primary mt-3">
+            <i class="fas fa-sliders-h me-2"></i>Advanced Search
+        </a>
+    </div>
+    {% else %}
+    
+    <!-- Document Results -->
+    {% if documents and search_type != 'templates' %}
+    <div class="mb-5">
+        <h4 class="mb-3">
+            <i class="fas fa-file-alt text-primary me-2"></i>Documents
+        </h4>
+        
+        <div class="row">
+            {% for document in documents %}
+            <div class="col-md-6 mb-3">
+                <div class="card result-card document h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <a href="{% url 'documents:document_detail' document.id %}" class="text-decoration-none">
+                                {{ document.name }}
+                            </a>
+                        </h5>
+                        
+                        <div class="d-flex gap-2 mb-2">
+                            {% if document.template %}
+                            <span class="badge bg-success">
+                                <i class="fas fa-th-large me-1"></i>{{ document.template.name }}
+                            </span>
+                            {% endif %}
+                            
+                            {% if document.confidence_score %}
+                            <span class="badge bg-info">
+                                <i class="fas fa-check-circle me-1"></i>{{ document.confidence_score|floatformat:1 }}%
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if document.text_content %}
+                        <p class="card-text text-muted small">
+                            {{ document.text_content|truncatewords:30 }}
+                        </p>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar me-1"></i>
+                                {{ document.created_at|date:"M d, Y" }}
+                            </small>
+                            <a href="{% url 'documents:document_detail' document.id %}" class="btn btn-sm btn-outline-primary">
+                                View Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Template Results -->
+    {% if templates and search_type != 'documents' %}
+    <div class="mb-5">
+        <h4 class="mb-3">
+            <i class="fas fa-th-large text-success me-2"></i>Templates
+        </h4>
+        
+        <div class="row">
+            {% for template in templates %}
+            <div class="col-md-6 mb-3">
+                <div class="card result-card template h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <a href="{% url 'templates:template_detail' template.id %}" class="text-decoration-none">
+                                {{ template.name }}
+                            </a>
+                        </h5>
+                        
+                        <div class="d-flex gap-2 mb-2">
+                            <span class="badge bg-primary">
+                                <i class="fas fa-list me-1"></i>{{ template.field_count }} field{{ template.field_count|pluralize }}
+                            </span>
+                            
+                            {% if template.document_count %}
+                            <span class="badge bg-info">
+                                <i class="fas fa-file-alt me-1"></i>{{ template.document_count }} document{{ template.document_count|pluralize }}
+                            </span>
+                            {% endif %}
+                            
+                            {% if template.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if template.description %}
+                        <p class="card-text text-muted small">
+                            {{ template.description|truncatewords:20 }}
+                        </p>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar me-1"></i>
+                                {{ template.created_at|date:"M d, Y" }}
+                            </small>
+                            <a href="{% url 'templates:template_detail' template.id %}" class="btn btn-sm btn-outline-success">
+                                View Template
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    {% endif %}
+    {% else %}
+    <!-- Initial State -->
+    <div class="text-center py-5">
+        <i class="fas fa-search fa-4x text-muted mb-4"></i>
+        <h3>Start Searching</h3>
+        <p class="text-muted">Enter keywords to search documents and templates</p>
+        
+        <div class="row mt-5">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <i class="fas fa-file-alt fa-2x text-primary mb-3"></i>
+                        <h5>Search Documents</h5>
+                        <p class="text-muted small">Find documents by name, content, or extracted data</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <i class="fas fa-th-large fa-2x text-success mb-3"></i>
+                        <h5>Search Templates</h5>
+                        <p class="text-muted small">Find templates by name, description, or fields</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <i class="fas fa-sliders-h fa-2x text-info mb-3"></i>
+                        <h5>Advanced Search</h5>
+                        <p class="text-muted small">Use filters for precise results</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

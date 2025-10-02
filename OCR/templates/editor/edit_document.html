@@ -65,7 +65,6 @@
     #textArea.wrap-off {
         white-space: pre;
         overflow-x: auto;
-
     }
     
     .preview-panel {
@@ -175,8 +174,11 @@
                     <i class="fas fa-download"></i> Export <i class="fas fa-caret-down ms-1"></i>
                 </button>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="{% url 'editor:export_text_document' document.id %}?format=docx">
-                        <i class="fas fa-file-word"></i> Word Document (.docx)</a></li>
+                    <li><a class="dropdown-item" href="{% url 'editor:export_text_document_docx' document.id %}">
+                        <i class="fas fa-file-word text-primary"></i> Word Document (.docx)</a></li>
+                    <li><a class="dropdown-item" href="{% url 'editor:export_text_document_pdf' document.id %}">
+                        <i class="fas fa-file-pdf text-danger"></i> PDF Document (.pdf)</a></li>
+                    <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="#" onclick="exportDocument('txt')">
                         <i class="fas fa-file-alt"></i> Text File (.txt)</a></li>
                     <li><a class="dropdown-item" href="#" onclick="exportDocument('json')">
