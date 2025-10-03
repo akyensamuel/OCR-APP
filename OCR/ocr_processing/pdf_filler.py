@@ -379,15 +379,33 @@ class PDFFiller:
                             value = str(field.get('value', ''))[:50]  # Truncate long values
                             row.append(value)
                     elif 'cells' in extracted_data:
-                        # Extract from table format
+                        # Extract from table format - add ALL data rows (skip header row 0)
                         cells = extracted_data['cells']
-                        for col_idx in range(len(field_names)):
-                            value = ''
-                            for cell_data in cells:
-                                if cell_data.get('row', 0) == 1 and cell_data.get('col', 0) == col_idx:
-                                    value = cell_data.get('text', '')[:50]
-                                    break
-                            row.append(value)
+                        # Group cells by row
+                        cell_rows = {}
+                        for cell_data in cells:
+                            cell_row = cell_data.get('row', 0)
+                            col = cell_data.get('col', 0)
+                            text = cell_data.get('text', '')
+                            if cell_row not in cell_rows:
+                                cell_rows[cell_row] = {}
+                            cell_rows[cell_row][col] = text
+                        
+                        # Add a row for each data row in the table (skip header at row 0)
+                        for data_row_idx in sorted(cell_rows.keys()):
+                            if data_row_idx > 0:  # Skip header row
+                                if data_row_idx > 1:
+                                    # Add new row with repeated document name
+                                    row = [doc_obj.name[:30]]
+                                
+                                for col_idx in range(len(field_names)):
+                                    value = cell_rows[data_row_idx].get(col_idx, '')[:50]
+                                    row.append(value)
+                                
+                                table_data.append(row)
+                                
+                        # Continue to next document (skip default row.append)
+                        continue
                     else:
                         row.extend([''] * len(field_names))
                     

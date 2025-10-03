@@ -10,7 +10,23 @@ class Template(models.Model):
     """
     name = models.CharField(max_length=255, help_text="Name of the template")
     description = models.TextField(blank=True, null=True, help_text="Description of what this template is for")
-    file = models.FileField(upload_to='templates/', help_text="Original template file (PDF/image)")
+    
+    # Store file directly in database as binary data
+    file_data = models.BinaryField(null=True, blank=True, help_text="Original template file data (stored in DB)")
+    file_name = models.CharField(max_length=255, null=True, blank=True, help_text="Original filename")
+    file_type = models.CharField(max_length=50, null=True, blank=True, help_text="File MIME type")
+    file_size = models.IntegerField(null=True, blank=True, help_text="File size in bytes")
+    
+    # Excel template file (generated)
+    excel_template_data = models.BinaryField(null=True, blank=True, help_text="Generated Excel template (stored in DB)")
+    excel_template_name = models.CharField(max_length=255, null=True, blank=True, help_text="Excel template filename")
+    
+    # Visualization image (generated)
+    visualization_data = models.BinaryField(null=True, blank=True, help_text="Detection visualization image (stored in DB)")
+    visualization_name = models.CharField(max_length=255, null=True, blank=True, help_text="Visualization filename")
+    
+    # Keep for backward compatibility (will be deprecated)
+    file = models.FileField(upload_to='templates/', blank=True, null=True, help_text="Original template file (PDF/image) - deprecated")
     
     # JSON field to store the extracted structure (field names, coordinates, etc.)
     structure = models.JSONField(

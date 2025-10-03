@@ -16,6 +16,19 @@ urlpatterns = [
     path('<int:template_id>/save-structure/', views.save_template_structure, name='save_template_structure'),
     path('<int:template_id>/reprocess/', views.reprocess_template, name='reprocess_template'),
     path('<int:template_id>/fields/', views.template_fields_api, name='template_fields_api'),
+    # Interactive template editor
+    path('<int:template_id>/editor/', views.template_editor, name='template_editor'),
+    path('<int:template_id>/editor/get-data/', views.template_editor_get_data, name='template_editor_get_data'),
+    path('<int:template_id>/editor/save-data/', views.template_editor_save_data, name='template_editor_save_data'),
+    path('<int:template_id>/editor/add-row/', views.template_editor_add_row, name='template_editor_add_row'),
+    path('<int:template_id>/editor/delete-row/', views.template_editor_delete_row, name='template_editor_delete_row'),
+    path('<int:template_id>/editor/add-column/', views.template_editor_add_column, name='template_editor_add_column'),
+    path('<int:template_id>/editor/delete-column/', views.template_editor_delete_column, name='template_editor_delete_column'),
+    path('<int:template_id>/editor/update-cell/', views.template_editor_update_cell, name='template_editor_update_cell'),
+    # File serving (from database)
+    path('<int:template_id>/file/', views.serve_template_file, name='serve_template_file'),
+    path('<int:template_id>/excel/', views.serve_template_excel, name='serve_template_excel'),
+    path('<int:template_id>/visualization/', views.serve_template_visualization, name='serve_template_visualization'),
     # Alternative actions to deletion
     path('<int:template_id>/deactivate/', views.template_deactivate, name='template_deactivate'),
     path('<int:template_id>/archive/', views.template_archive, name='template_archive'),

@@ -115,9 +115,9 @@ class ExcelTemplateManager:
                     cell.border = self.thin_border
             
             elif 'cells' in document_data:
-                # Table detection format - append as a single row
+                # Table detection format - append ALL rows (skip header row 0)
                 cells = document_data['cells']
-                # Group cells by row and get data from first data row (not header)
+                # Group cells by row
                 row_data = {}
                 for cell_data in cells:
                     row = cell_data.get('row', 0)
@@ -127,13 +127,15 @@ class ExcelTemplateManager:
                         row_data[row] = {}
                     row_data[row][col] = text
                 
-                # Get first data row (skip header at row 0)
-                if len(row_data) > 1:
-                    data_row = row_data.get(1, {})  # Get row 1 (first data row after header)
-                    for col_idx in sorted(data_row.keys()):
-                        cell = ws.cell(row=next_row, column=col_idx + 1, value=data_row[col_idx])
-                        cell.alignment = Alignment(horizontal="left", vertical="center")
-                        cell.border = self.thin_border
+                # Append all data rows (skip header at row 0)
+                current_row = next_row
+                for row_idx in sorted(row_data.keys()):
+                    if row_idx > 0:  # Skip header row (row 0)
+                        for col_idx in sorted(row_data[row_idx].keys()):
+                            cell = ws.cell(row=current_row, column=col_idx + 1, value=row_data[row_idx][col_idx])
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
+                            cell.border = self.thin_border
+                        current_row += 1
             
             # Save the workbook
             wb.save(excel_path)
@@ -191,7 +193,7 @@ class ExcelTemplateManager:
                         cell.border = self.thin_border
                 
                 elif 'cells' in extracted_data:
-                    # Table detection format - extract first data row
+                    # Table detection format - extract ALL data rows (skip header row 0)
                     cells = extracted_data['cells']
                     row_data = {}
                     for cell_data in cells:
@@ -202,16 +204,19 @@ class ExcelTemplateManager:
                             row_data[row] = {}
                         row_data[row][col] = text
                     
-                    # Get first data row (skip header at row 0)
-                    if len(row_data) > 1:
-                        data_row = row_data.get(1, {})
-                        for col_idx in sorted(data_row.keys()):
-                            if col_idx + 1 <= len(headers):
-                                cell = ws.cell(row=current_row, column=col_idx + 1, value=data_row[col_idx])
-                                cell.alignment = Alignment(horizontal="left", vertical="center")
-                                cell.border = self.thin_border
+                    # Export all data rows (skip header at row 0)
+                    for row_idx in sorted(row_data.keys()):
+                        if row_idx > 0:  # Skip header row
+                            for col_idx in sorted(row_data[row_idx].keys()):
+                                if col_idx + 1 <= len(headers):
+                                    cell = ws.cell(row=current_row, column=col_idx + 1, value=row_data[row_idx][col_idx])
+                                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                                    cell.border = self.thin_border
+                            current_row += 1
                 
-                current_row += 1
+                else:
+                    # No data, just increment row
+                    current_row += 1
             
             # Auto-adjust column widths
             for col in ws.columns:

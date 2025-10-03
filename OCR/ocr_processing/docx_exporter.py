@@ -316,13 +316,34 @@ class DocxExporter:
                                 row_cells[i + 1].text = str(field.get('value', ''))
                     
                     elif 'cells' in extracted_data:
-                        # Table format - extract first data row
+                        # Table format - extract ALL data rows (skip header row 0)
+                        # For consolidated view, add multiple rows for documents with multiple data rows
                         cells = extracted_data['cells']
+                        # Group cells by row
+                        cell_rows = {}
                         for cell_data in cells:
-                            if cell_data.get('row', 0) == 1:  # First data row after header
-                                col = cell_data.get('col', 0)
-                                if col < len(field_names):
-                                    row_cells[col + 1].text = cell_data.get('text', '')
+                            cell_row = cell_data.get('row', 0)
+                            col = cell_data.get('col', 0)
+                            text = cell_data.get('text', '')
+                            if cell_row not in cell_rows:
+                                cell_rows[cell_row] = {}
+                            cell_rows[cell_row][col] = text
+                        
+                        # Add a row for each data row in the table (skip header at row 0)
+                        first_row = True
+                        for data_row_idx in sorted(cell_rows.keys()):
+                            if data_row_idx > 0:  # Skip header row
+                                if not first_row:
+                                    # Add new row for additional data rows
+                                    row_cells = table.add_row().cells
+                                    row_cells[0].text = doc_obj.name  # Repeat document name
+                                
+                                # Fill columns
+                                for col_idx in range(len(field_names)):
+                                    if col_idx in cell_rows[data_row_idx]:
+                                        row_cells[col_idx + 1].text = cell_rows[data_row_idx][col_idx]
+                                
+                                first_row = False
             
             # Add page break and individual document details
             doc.add_page_break()

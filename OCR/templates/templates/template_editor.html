@@ -1,0 +1,753 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Edit Template - {{ template.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .template-editor-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-top: 20px;
+    }
+    
+    .editor-toolbar {
+        display: flex;
+        gap: 10px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .editor-toolbar button {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .table-container {
+        overflow: auto;
+        max-height: 600px;
+        border: 2px solid #dee2e6;
+        border-radius: 4px;
+    }
+    
+    #editable-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+    
+    #editable-table th,
+    #editable-table td {
+        border: 1px solid #dee2e6;
+        padding: 8px;
+        min-width: 120px;
+        position: relative;
+    }
+    
+    #editable-table th {
+        background: #e9ecef;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    #editable-table td {
+        background: white;
+        cursor: text;
+    }
+    
+    #editable-table td:hover {
+        background: #f8f9fa;
+    }
+    
+    #editable-table td.editing {
+        background: #fff3cd;
+    }
+    
+    #editable-table td.header-cell {
+        background: #d1ecf1;
+        font-weight: 600;
+    }
+    
+    #editable-table td input {
+        width: 100%;
+        border: none;
+        padding: 4px;
+        font-size: 14px;
+        background: transparent;
+    }
+    
+    #editable-table td input:focus {
+        outline: 2px solid #0d6efd;
+        outline-offset: -2px;
+    }
+    
+    .cell-actions {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        display: none;
+        gap: 2px;
+    }
+    
+    #editable-table td:hover .cell-actions {
+        display: flex;
+    }
+    
+    .cell-action-btn {
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        padding: 2px 6px;
+        font-size: 10px;
+        cursor: pointer;
+    }
+    
+    .cell-action-btn:hover {
+        background: #5a6268;
+    }
+    
+    .row-number, .col-number {
+        background: #e9ecef;
+        font-weight: 600;
+        text-align: center;
+        min-width: 40px !important;
+        color: #6c757d;
+        font-size: 12px;
+    }
+    
+    .context-menu {
+        position: absolute;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        z-index: 1000;
+        display: none;
+    }
+    
+    .context-menu-item {
+        padding: 8px 15px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .context-menu-item:hover {
+        background: #f8f9fa;
+    }
+    
+    .context-menu-divider {
+        height: 1px;
+        background: #dee2e6;
+        margin: 4px 0;
+    }
+    
+    .save-indicator {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        background: #28a745;
+        color: white;
+        border-radius: 6px;
+        display: none;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+        from {
+            transform: translateY(100px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    
+    .stats-bar {
+        display: flex;
+        gap: 20px;
+        padding: 10px 15px;
+        background: #e7f3ff;
+        border-radius: 4px;
+        margin-bottom: 15px;
+        align-items: center;
+    }
+    
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 14px;
+    }
+    
+    .stat-value {
+        font-weight: 600;
+        color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'templates:home' %}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'templates:template_list' %}">Templates</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'templates:template_detail' template.id %}">{{ template.name }}</a></li>
+                <li class="breadcrumb-item active">Editor</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>
+                <i class="fas fa-table me-2"></i>
+                Template Editor: {{ template.name }}
+            </h2>
+            <div class="btn-group">
+                <a href="{% url 'templates:template_detail' template.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="template-editor-container">
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stat-item">
+            <i class="fas fa-th"></i>
+            <span>Rows: <span class="stat-value" id="row-count">0</span></span>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-columns"></i>
+            <span>Columns: <span class="stat-value" id="col-count">0</span></span>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-cube"></i>
+            <span>Cells: <span class="stat-value" id="cell-count">0</span></span>
+        </div>
+        <div class="stat-item ms-auto">
+            <i class="fas fa-info-circle"></i>
+            <small class="text-muted">Double-click to edit, right-click for options</small>
+        </div>
+    </div>
+
+    <!-- Editor Toolbar -->
+    <div class="editor-toolbar">
+        <button class="btn btn-success btn-sm" onclick="saveTemplate()">
+            <i class="fas fa-save"></i>
+            Save Changes
+        </button>
+        <div class="btn-group">
+            <button class="btn btn-primary btn-sm" onclick="addRow('start')">
+                <i class="fas fa-plus"></i>
+                Add Row Top
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="addRow('end')">
+                <i class="fas fa-plus"></i>
+                Add Row Bottom
+            </button>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-info btn-sm" onclick="addColumn('start')">
+                <i class="fas fa-plus"></i>
+                Add Column Left
+            </button>
+            <button class="btn btn-info btn-sm" onclick="addColumn('end')">
+                <i class="fas fa-plus"></i>
+                Add Column Right
+            </button>
+        </div>
+        <button class="btn btn-warning btn-sm" onclick="toggleHeaderMode()">
+            <i class="fas fa-heading"></i>
+            <span id="header-mode-text">Mark as Header</span>
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="reloadData()">
+            <i class="fas fa-sync"></i>
+            Reload
+        </button>
+    </div>
+
+    <!-- Table Container -->
+    <div class="table-container">
+        <table id="editable-table">
+            <thead>
+                <tr id="column-headers">
+                    <th class="row-number">#</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Table rows will be dynamically generated -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Context Menu -->
+<div id="context-menu" class="context-menu">
+    <div class="context-menu-item" onclick="contextAddRowAbove()">
+        <i class="fas fa-arrow-up"></i>
+        Insert Row Above
+    </div>
+    <div class="context-menu-item" onclick="contextAddRowBelow()">
+        <i class="fas fa-arrow-down"></i>
+        Insert Row Below
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextAddColumnLeft()">
+        <i class="fas fa-arrow-left"></i>
+        Insert Column Left
+    </div>
+    <div class="context-menu-item" onclick="contextAddColumnRight()">
+        <i class="fas fa-arrow-right"></i>
+        Insert Column Right
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextDeleteRow()">
+        <i class="fas fa-trash text-danger"></i>
+        Delete Row
+    </div>
+    <div class="context-menu-item" onclick="contextDeleteColumn()">
+        <i class="fas fa-trash text-danger"></i>
+        Delete Column
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextToggleHeader()">
+        <i class="fas fa-heading"></i>
+        Toggle Header
+    </div>
+</div>
+
+<!-- Save Indicator -->
+<div id="save-indicator" class="save-indicator">
+    <i class="fas fa-check-circle"></i>
+    <span id="save-message">Saved successfully!</span>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const templateId = {{ template.id }};
+    let templateData = {
+        cells: [],
+        rows: 0,
+        cols: 0,
+        headers: {}
+    };
+    let selectedCell = null;
+    let contextMenuCell = null;
+    let headerMode = false;
+
+    // Load template data on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadTemplateData();
+    });
+
+    // Load template data from server
+    function loadTemplateData() {
+        fetch(`/templates/${templateId}/editor/get-data/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    templateData = data.data;
+                    renderTable();
+                    updateStats();
+                } else {
+                    alert('Error loading template: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to load template data');
+            });
+    }
+
+    // Render the table
+    function renderTable() {
+        const thead = document.getElementById('column-headers');
+        const tbody = document.getElementById('table-body');
+        
+        // Clear existing content
+        thead.innerHTML = '<th class="row-number">#</th>';
+        tbody.innerHTML = '';
+
+        // Add column headers
+        for (let col = 0; col < templateData.cols; col++) {
+            const th = document.createElement('th');
+            th.className = 'col-number';
+            th.textContent = String.fromCharCode(65 + col); // A, B, C, ...
+            th.onclick = () => selectColumn(col);
+            thead.appendChild(th);
+        }
+
+        // Add rows
+        for (let row = 0; row < templateData.rows; row++) {
+            const tr = document.createElement('tr');
+            
+            // Row number
+            const rowNumCell = document.createElement('td');
+            rowNumCell.className = 'row-number';
+            rowNumCell.textContent = row + 1;
+            rowNumCell.onclick = () => selectRow(row);
+            tr.appendChild(rowNumCell);
+
+            // Data cells
+            for (let col = 0; col < templateData.cols; col++) {
+                const cell = getCellData(row, col);
+                const td = document.createElement('td');
+                td.dataset.row = row;
+                td.dataset.col = col;
+                td.textContent = cell.text || '';
+                
+                if (cell.is_header) {
+                    td.classList.add('header-cell');
+                }
+
+                // Double-click to edit
+                td.ondblclick = () => editCell(td, row, col);
+                
+                // Right-click for context menu
+                td.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    showContextMenu(e, row, col);
+                };
+
+                tr.appendChild(td);
+            }
+
+            tbody.appendChild(tr);
+        }
+    }
+
+    // Get cell data from templateData
+    function getCellData(row, col) {
+        const cell = templateData.cells.find(c => c.row === row && c.col === col);
+        return cell || { row, col, text: '', is_header: false, confidence: 0 };
+    }
+
+    // Edit cell
+    function editCell(td, row, col) {
+        if (td.querySelector('input')) return; // Already editing
+
+        const currentText = td.textContent;
+        td.classList.add('editing');
+        td.innerHTML = '';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentText;
+        input.onblur = () => saveCellEdit(td, row, col, input.value);
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                input.blur();
+            } else if (e.key === 'Escape') {
+                td.textContent = currentText;
+                td.classList.remove('editing');
+            }
+        };
+
+        td.appendChild(input);
+        input.focus();
+        input.select();
+    }
+
+    // Save cell edit
+    function saveCellEdit(td, row, col, newText) {
+        td.classList.remove('editing');
+        td.textContent = newText;
+
+        // Update local data
+        let cell = templateData.cells.find(c => c.row === row && c.col === col);
+        if (cell) {
+            cell.text = newText;
+        } else {
+            cell = { row, col, text: newText, is_header: false, confidence: 0 };
+            templateData.cells.push(cell);
+        }
+
+        // Send update to server
+        updateCellOnServer(row, col, newText, cell.is_header);
+    }
+
+    // Update cell on server
+    function updateCellOnServer(row, col, text, isHeader) {
+        fetch(`/templates/${templateId}/editor/update-cell/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ row, col, text, is_header: isHeader })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                console.error('Failed to update cell:', data.error);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // Add row
+    function addRow(position) {
+        fetch(`/templates/${templateId}/editor/add-row/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ position })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSaveIndicator('Row added successfully');
+                loadTemplateData();
+            } else {
+                alert('Error adding row: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to add row');
+        });
+    }
+
+    // Add column
+    function addColumn(position) {
+        fetch(`/templates/${templateId}/editor/add-column/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ position })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSaveIndicator('Column added successfully');
+                loadTemplateData();
+            } else {
+                alert('Error adding column: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to add column');
+        });
+    }
+
+    // Delete row
+    function deleteRow(row) {
+        if (!confirm(`Delete row ${row + 1}?`)) return;
+
+        fetch(`/templates/${templateId}/editor/delete-row/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ row })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSaveIndicator('Row deleted successfully');
+                loadTemplateData();
+            } else {
+                alert('Error deleting row: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete row');
+        });
+    }
+
+    // Delete column
+    function deleteColumn(col) {
+        if (!confirm(`Delete column ${String.fromCharCode(65 + col)}?`)) return;
+
+        fetch(`/templates/${templateId}/editor/delete-column/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ col })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSaveIndicator('Column deleted successfully');
+                loadTemplateData();
+            } else {
+                alert('Error deleting column: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete column');
+        });
+    }
+
+    // Save entire template
+    function saveTemplate() {
+        fetch(`/templates/${templateId}/editor/save-data/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(templateData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSaveIndicator('Template saved successfully!');
+            } else {
+                alert('Error saving template: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to save template');
+        });
+    }
+
+    // Toggle header mode
+    function toggleHeaderMode() {
+        headerMode = !headerMode;
+        document.getElementById('header-mode-text').textContent = 
+            headerMode ? 'Header Mode: ON' : 'Mark as Header';
+        
+        // Update all cells click behavior
+        document.querySelectorAll('#editable-table td[data-row]').forEach(td => {
+            if (headerMode) {
+                td.style.cursor = 'pointer';
+                td.onclick = () => {
+                    const row = parseInt(td.dataset.row);
+                    const col = parseInt(td.dataset.col);
+                    toggleCellHeader(td, row, col);
+                };
+            } else {
+                td.style.cursor = 'text';
+                td.onclick = null;
+            }
+        });
+    }
+
+    // Toggle cell header status
+    function toggleCellHeader(td, row, col) {
+        const cell = getCellData(row, col);
+        cell.is_header = !cell.is_header;
+        
+        if (cell.is_header) {
+            td.classList.add('header-cell');
+        } else {
+            td.classList.remove('header-cell');
+        }
+
+        updateCellOnServer(row, col, cell.text, cell.is_header);
+    }
+
+    // Context menu functions
+    function showContextMenu(e, row, col) {
+        const menu = document.getElementById('context-menu');
+        menu.style.display = 'block';
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+        contextMenuCell = { row, col };
+    }
+
+    document.addEventListener('click', () => {
+        document.getElementById('context-menu').style.display = 'none';
+    });
+
+    function contextAddRowAbove() {
+        addRow(contextMenuCell.row);
+    }
+
+    function contextAddRowBelow() {
+        addRow(contextMenuCell.row + 1);
+    }
+
+    function contextAddColumnLeft() {
+        addColumn(contextMenuCell.col);
+    }
+
+    function contextAddColumnRight() {
+        addColumn(contextMenuCell.col + 1);
+    }
+
+    function contextDeleteRow() {
+        deleteRow(contextMenuCell.row);
+    }
+
+    function contextDeleteColumn() {
+        deleteColumn(contextMenuCell.col);
+    }
+
+    function contextToggleHeader() {
+        const td = document.querySelector(`td[data-row="${contextMenuCell.row}"][data-col="${contextMenuCell.col}"]`);
+        toggleCellHeader(td, contextMenuCell.row, contextMenuCell.col);
+    }
+
+    // Select row
+    function selectRow(row) {
+        console.log('Selected row:', row);
+    }
+
+    // Select column
+    function selectColumn(col) {
+        console.log('Selected column:', col);
+    }
+
+    // Reload data
+    function reloadData() {
+        loadTemplateData();
+        showSaveIndicator('Data reloaded');
+    }
+
+    // Update stats
+    function updateStats() {
+        document.getElementById('row-count').textContent = templateData.rows;
+        document.getElementById('col-count').textContent = templateData.cols;
+        document.getElementById('cell-count').textContent = templateData.cells.length;
+    }
+
+    // Show save indicator
+    function showSaveIndicator(message) {
+        const indicator = document.getElementById('save-indicator');
+        document.getElementById('save-message').textContent = message;
+        indicator.style.display = 'flex';
+        setTimeout(() => {
+            indicator.style.display = 'none';
+        }, 3000);
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            saveTemplate();
+        }
+    });
+</script>
+{% endblock %}

@@ -9,7 +9,15 @@ class Document(models.Model):
     or standalone documents for general text extraction.
     """
     name = models.CharField(max_length=255, help_text="Document name or identifier")
-    file = models.FileField(upload_to='documents/', help_text="Original uploaded document")
+    
+    # Store file directly in database as binary data
+    file_data = models.BinaryField(null=True, blank=True, help_text="Original document file data (stored in DB)")
+    file_name = models.CharField(max_length=255, null=True, blank=True, help_text="Original filename")
+    file_type = models.CharField(max_length=50, null=True, blank=True, help_text="File MIME type")
+    file_size = models.IntegerField(null=True, blank=True, help_text="File size in bytes")
+    
+    # Keep for backward compatibility (will be deprecated)
+    file = models.FileField(upload_to='documents/', blank=True, null=True, help_text="Original uploaded document - deprecated")
     
     # Optional link to template (None for general text extraction)
     template = models.ForeignKey(
@@ -26,12 +34,16 @@ class Document(models.Model):
         help_text="Extracted structured data based on template fields"
     )
     
-    # Excel file with populated data (for table-based templates)
+    # Excel file with populated data (for table-based templates) - stored in DB
+    excel_data = models.BinaryField(null=True, blank=True, help_text="Populated Excel file data (stored in DB)")
+    excel_name = models.CharField(max_length=255, null=True, blank=True, help_text="Excel filename")
+    
+    # Keep for backward compatibility (will be deprecated)
     excel_file = models.FileField(
         upload_to='documents/excel/',
         blank=True,
         null=True,
-        help_text="Populated Excel file with extracted data"
+        help_text="Populated Excel file with extracted data - deprecated"
     )
     
     # Raw text version (for general text extraction mode)

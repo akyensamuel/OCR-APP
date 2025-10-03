@@ -95,7 +95,7 @@ The PDF should include:
             else:
                 print("   ⚠️  Document has no template, using plain text method")
                 pdf_filler.create_pdf_from_text(
-                    text=document.text_content or "No text content",
+                    text=document.text_version or "No text content",  # Fixed: text_version not text_content
                     output_path=output_path,
                     title=document.name
                 )

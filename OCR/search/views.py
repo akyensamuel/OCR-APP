@@ -52,7 +52,7 @@ def search_documents(query):
     """
     # Build search query with OR conditions
     search_query = Q(name__icontains=query)
-    search_query |= Q(text_content__icontains=query)
+    search_query |= Q(text_version__icontains=query)  # Fixed: text_version not text_content
     search_query |= Q(extracted_data__icontains=query)
     
     # Search by template name
@@ -115,7 +115,7 @@ def advanced_search(request):
     # Apply text search
     if query:
         search_query = Q(name__icontains=query)
-        search_query |= Q(text_content__icontains=query)
+        search_query |= Q(text_version__icontains=query)  # Fixed: text_version not text_content
         search_query |= Q(extracted_data__icontains=query)
         documents = documents.filter(search_query)
     

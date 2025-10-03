@@ -204,7 +204,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 )
             else:
                 pdf_filler.create_pdf_from_text(
-                    text=document.text_content or "No text content",
+                    text=document.text_version or "No text content",  # Fixed: text_version not text_content
                     output_path=temp_file.name,
                     title=document.name
                 )
@@ -241,7 +241,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
             ocr_engine = OCREngine()
             ocr_result = ocr_engine.extract_text(file_path)
             
-            document.text_content = ocr_result.get('text', '')
+            document.text_version = ocr_result.get('text', '')  # Fixed: text_version not text_content
             document.confidence_score = ocr_result.get('confidence', 0)
             document.processing_status = 'completed'
             document.save()

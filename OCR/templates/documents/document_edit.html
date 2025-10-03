@@ -26,8 +26,69 @@
         <form method="post" id="editDocumentForm">
             {% csrf_token %}
             
+            <!-- Table Cell Editing (Table Detection Format) -->
+            {% if document.extracted_data.cells %}
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table me-2"></i>
+                        Table Data Editor
+                        {% if document.template %}
+                        <span class="badge bg-info ms-2">Template: {{ document.template.name }}</span>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Table Document:</strong> Edit individual cell values extracted from the table. Changes will be saved to the database.
+                    </div>
+                    
+                    <!-- Build table structure from cells -->
+                    {% regroup document.extracted_data.cells by row as row_groups %}
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm table-hover">
+                            {% for row_group in row_groups %}
+                            <tr {% if forloop.first %}class="table-primary"{% endif %}>
+                                {% for cell in row_group.list|dictsort:"col" %}
+                                <td {% if forloop.parentloop.first %}style="font-weight: bold;"{% endif %}>
+                                    {% if cell.row == 0 %}
+                                        <!-- Header row - not editable -->
+                                        {{ cell.text }}
+                                    {% else %}
+                                        <!-- Data cells - editable - find cell index in original list -->
+                                        {% for orig_cell in document.extracted_data.cells %}
+                                            {% if orig_cell.row == cell.row and orig_cell.col == cell.col %}
+                                                <input type="text" class="form-control form-control-sm" 
+                                                       name="cell_{{ forloop.counter0 }}_value"
+                                                       value="{{ cell.text }}"
+                                                       data-original="{{ cell.text }}"
+                                                       data-row="{{ cell.row }}"
+                                                       data-col="{{ cell.col }}"
+                                                       onchange="markCellAsEdited(this)"
+                                                       style="min-width: 100px;">
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Editing {{ document.extracted_data.cells|length }} cells across {{ row_groups|length }} rows.
+                            Header row is read-only.
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Template-based Document Editing -->
-            {% if document.template and document.extracted_data.fields %}
+            {% elif document.template and document.extracted_data.fields %}
             <div class="card shadow-sm">
                 <div class="card-header">
                     <h5 class="mb-0">
@@ -286,6 +347,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+function markCellAsEdited(input) {
+    const original = input.getAttribute('data-original');
+    if (input.value !== original) {
+        input.classList.add('border-warning');
+        input.parentElement.classList.add('bg-warning-subtle');
+        hasChanges = true;
+    } else {
+        input.classList.remove('border-warning');
+        input.parentElement.classList.remove('bg-warning-subtle');
+    }
+}
+
 function markFieldAsEdited(input) {
     const original = input.getAttribute('data-original');
     if (input.value !== original) {
@@ -418,10 +491,21 @@ function previewChanges() {
     const content = document.getElementById('previewContent');
     
     // Generate preview content
-    let preview = '<h6>Changed Fields:</h6><ul>';
+    let preview = '<h6>Changes Summary:</h6><ul>';
     let hasChanges = false;
     
-    // Check for field changes
+    // Check for cell changes (table format)
+    document.querySelectorAll('input[name^="cell_"]').forEach(input => {
+        const original = input.getAttribute('data-original');
+        if (input.value !== original) {
+            const row = input.getAttribute('data-row');
+            const col = input.getAttribute('data-col');
+            preview += `<li><strong>Cell [Row ${row}, Col ${col}]:</strong> "${original}" → "${input.value}"</li>`;
+            hasChanges = true;
+        }
+    });
+    
+    // Check for field changes (template format)
     document.querySelectorAll('input[name^="field_"]').forEach(input => {
         const original = input.getAttribute('data-original');
         if (input.value !== original) {

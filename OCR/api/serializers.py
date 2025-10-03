@@ -73,7 +73,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = [
-            'id', 'name', 'file', 'file_url', 'text_content',
+            'id', 'name', 'file', 'file_url', 'text_version',  # Fixed: text_version not text_content
             'extracted_data', 'extracted_fields', 'confidence_score',
             'processing_status', 'template', 'template_id',
             'uploaded_by', 'created_at', 'updated_at',
@@ -141,7 +141,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = ['name', 'file', 'template_id', 'text_content']
+        fields = ['name', 'file', 'template_id', 'text_version']  # Fixed: text_version not text_content
     
     def create(self, validated_data):
         """Create document and trigger OCR processing"""
@@ -162,7 +162,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 ocr_engine = OCREngine()
                 ocr_result = ocr_engine.extract_text(file_path)
                 
-                document.text_content = ocr_result.get('text', '')
+                document.text_version = ocr_result.get('text', '')  # Fixed: text_version not text_content
                 document.confidence_score = ocr_result.get('confidence', 0)
                 document.processing_status = 'completed'
                 document.save()

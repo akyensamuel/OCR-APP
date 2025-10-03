@@ -24,16 +24,14 @@ def document_upload(request):
             
             # Process with OCR
             from ocr_processing.ocr_core import OCREngine
-            from django.core.files.storage import default_storage
-            from django.conf import settings
+            from basemode.file_storage import save_file_to_db, get_temp_file_path, cleanup_temp_file
             import os
             
-            # Save uploaded file
-            file_path = default_storage.save(
-                f'uploads/documents/{uploaded_file.name}',
-                uploaded_file
-            )
-            full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+            # Save file to database
+            file_info = save_file_to_db(uploaded_file)
+            
+            # Create temp file for OCR processing
+            full_path = get_temp_file_path(file_info['file_data'], file_info['file_name'])
             
             # Initialize OCR and extract text
             ocr_engine = OCREngine()
@@ -53,10 +51,13 @@ def document_upload(request):
                     }
                 )
             
-            # Create Document record
+            # Create Document record with database storage
             document = Document.objects.create(
-                name=uploaded_file.name,
-                file=file_path,
+                name=file_info['file_name'],
+                file_data=file_info['file_data'],
+                file_name=file_info['file_name'],
+                file_type=file_info['file_type'],
+                file_size=file_info['file_size'],
                 uploaded_by=uploaded_by,
                 extracted_data={
                     'text': ocr_result.text,
@@ -66,10 +67,19 @@ def document_upload(request):
                 processing_status='completed'
             )
             
+            # Cleanup temp file
+            cleanup_temp_file(full_path)
+            
             messages.success(request, f'Document processed successfully! Confidence: {ocr_result.confidence:.1f}%')
             return redirect('documents:document_detail', document_id=document.pk)
             
         except Exception as e:
+            # Cleanup temp file on error
+            try:
+                if 'full_path' in locals():
+                    cleanup_temp_file(full_path)
+            except:
+                pass
             messages.error(request, f'Error processing document: {str(e)}')
             return redirect('documents:document_upload')
     
@@ -90,17 +100,14 @@ def document_upload_with_template(request, template_id):
             from ocr_processing.ocr_core import OCREngine
             from ocr_processing.table_detector import TableDetector
             from ocr_processing.excel_manager import ExcelTemplateManager
-            from django.core.files.storage import default_storage
-            from django.core.files import File
-            from django.conf import settings
+            from basemode.file_storage import save_file_to_db, get_temp_file_path, cleanup_temp_file, read_file_from_path
             import os
             
-            # Save uploaded file
-            file_path = default_storage.save(
-                f'uploads/documents/{uploaded_file.name}',
-                uploaded_file
-            )
-            full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+            # Save uploaded file to database
+            file_info = save_file_to_db(uploaded_file)
+            
+            # Create temp file for OCR processing
+            full_path = get_temp_file_path(file_info['file_data'], file_info['file_name'])
             
             # Get current user or create default user
             if request.user.is_authenticated:
@@ -141,27 +148,28 @@ def document_upload_with_template(request, template_id):
                     template_excel_path = excel_manager.get_template_excel_path(template)
                     
                     if template_excel_path:
-                        # Generate output path for populated Excel
-                        base_name = os.path.splitext(uploaded_file.name)[0]
+                        # Generate Excel in temp location
+                        base_name = os.path.splitext(file_info['file_name'])[0]
                         output_excel_name = f"{base_name}_extracted.xlsx"
-                        output_excel_path = os.path.join(
-                            settings.MEDIA_ROOT, 
-                            'documents', 
-                            'excel', 
-                            output_excel_name
-                        )
-                        
-                        # Ensure directory exists
-                        os.makedirs(os.path.dirname(output_excel_path), exist_ok=True)
+                        import tempfile
+                        excel_temp = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+                        output_excel_path = excel_temp.name
+                        excel_temp.close()
                         
                         # Append data to Excel template
                         excel_manager.append_document_to_excel(template_excel_path, extracted_data)
                         
-                        # Also create a copy for this specific document
+                        # Copy template to temp file
                         import shutil
                         shutil.copy(template_excel_path, output_excel_path)
                         
-                        excel_file_path = os.path.join('documents', 'excel', output_excel_name)
+                        # Read Excel file to binary for database storage
+                        excel_info = read_file_from_path(output_excel_path)
+                        excel_file_data = excel_info['file_data']
+                        excel_file_name = output_excel_name
+                        
+                        # Cleanup temp Excel file
+                        cleanup_temp_file(output_excel_path)
                 else:
                     # No table detected in document - use fallback extraction
                     messages.warning(request, 'No table structure detected in document. Using fallback extraction.')
@@ -197,26 +205,41 @@ def document_upload_with_template(request, template_id):
                     ]
                 }
             
-            # Create Document record
+            # Create Document record with database storage
             document = Document.objects.create(
-                name=uploaded_file.name,
-                file=file_path,
+                name=file_info['file_name'],
+                file_data=file_info['file_data'],
+                file_name=file_info['file_name'],
+                file_type=file_info['file_type'],
+                file_size=file_info['file_size'],
                 template=template,
                 uploaded_by=uploaded_by,
                 extracted_data=extracted_data,
                 processing_status='completed'
             )
             
-            # Attach Excel file if created
-            if excel_file_path:
-                document.excel_file = excel_file_path
+            # Attach Excel file data if created
+            if 'excel_file_data' in locals():
+                document.excel_data = excel_file_data
+                document.excel_name = excel_file_name
                 document.save()
+            
+            # Cleanup temp source file
+            cleanup_temp_file(full_path)
             
             field_count = len(extracted_data.get('fields', [])) or len(extracted_data.get('cells', []))
             messages.success(request, f'Document processed with template "{template.name}". Extracted {field_count} items.')
             return redirect('documents:document_detail', document_id=document.pk)
             
         except Exception as e:
+            # Cleanup temp files on error
+            try:
+                if 'full_path' in locals():
+                    cleanup_temp_file(full_path)
+                if 'output_excel_path' in locals():
+                    cleanup_temp_file(output_excel_path)
+            except:
+                pass
             import traceback
             traceback.print_exc()
             messages.error(request, f'Error processing document: {str(e)}')
@@ -238,7 +261,30 @@ def document_edit(request, document_id):
     if request.method == 'POST':
         try:
             # Handle different types of extracted data
-            if document.template and document.extracted_data and 'fields' in document.extracted_data:
+            if document.extracted_data and 'cells' in document.extracted_data:
+                # Table detection format: edit individual cells
+                updated_cells = []
+                cells = document.extracted_data['cells']
+                
+                for i, cell in enumerate(cells):
+                    # Get the new value from POST data
+                    new_value = request.POST.get(f'cell_{i}_value', cell.get('text', ''))
+                    
+                    updated_cells.append({
+                        'row': cell.get('row', 0),
+                        'col': cell.get('col', 0),
+                        'text': new_value,
+                        'confidence': cell.get('confidence', 0),
+                        'bbox': cell.get('bbox', []),
+                        'manually_edited': True
+                    })
+                
+                document.extracted_data['cells'] = updated_cells
+                document.extracted_data['last_edited'] = str(timezone.now())
+                
+                messages.success(request, f'Document cells updated successfully. Modified {len(updated_cells)} cells.')
+                
+            elif document.template and document.extracted_data and 'fields' in document.extracted_data:
                 # Template-based document: edit individual fields
                 updated_fields = []
                 
@@ -776,18 +822,23 @@ def document_export_csv(request, document_id):
             values = [field.get('value', '') for field in extracted_data['fields']]
             writer.writerow(values)
         elif 'cells' in extracted_data:
-            # Table format - extract first data row
+            # Table format - extract ALL data rows (skip header row 0)
             cells = extracted_data['cells']
+            # Group cells by row
             row_data = {}
             for cell_data in cells:
                 row = cell_data.get('row', 0)
                 col = cell_data.get('col', 0)
                 text = cell_data.get('text', '')
-                if row == 1:  # First data row after header
-                    row_data[col] = text
+                if row not in row_data:
+                    row_data[row] = {}
+                row_data[row][col] = text
             
-            values = [row_data.get(i, '') for i in range(len(field_names))]
-            writer.writerow(values)
+            # Write all data rows (skip header at row 0)
+            for row_idx in sorted(row_data.keys()):
+                if row_idx > 0:  # Skip header row
+                    values = [row_data[row_idx].get(i, '') for i in range(len(field_names))]
+                    writer.writerow(values)
     else:
         # General text export - just document info
         writer.writerow(['Document', 'Extracted Text', 'Confidence'])
@@ -828,39 +879,60 @@ def template_export_all_documents_csv(request, template_id):
     
     # Write data rows
     for document in documents:
-        row = [
-            document.name,
-            document.created_at.strftime('%Y-%m-%d %H:%M:%S')
-        ]
-        
         extracted_data = document.extracted_data
         
         if 'fields' in extracted_data:
-            # Template-based format
+            # Template-based format - single row per document
+            row = [
+                document.name,
+                document.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            ]
             for field in extracted_data['fields']:
                 row.append(field.get('value', ''))
+            
+            # Add confidence
+            confidence = f"{document.confidence_score:.1f}%" if document.confidence_score else 'N/A'
+            row.append(confidence)
+            writer.writerow(row)
+            
         elif 'cells' in extracted_data:
-            # Table format - extract first data row
+            # Table format - multiple rows per document (skip header row 0)
             cells = extracted_data['cells']
-            row_data = {}
+            # Group cells by row
+            cell_rows = {}
             for cell_data in cells:
                 cell_row = cell_data.get('row', 0)
                 col = cell_data.get('col', 0)
                 text = cell_data.get('text', '')
-                if cell_row == 1:  # First data row after header
-                    row_data[col] = text
+                if cell_row not in cell_rows:
+                    cell_rows[cell_row] = {}
+                cell_rows[cell_row][col] = text
             
-            for i in range(len(field_names)):
-                row.append(row_data.get(i, ''))
+            # Export all data rows (skip header at row 0)
+            for data_row_idx in sorted(cell_rows.keys()):
+                if data_row_idx > 0:  # Skip header row
+                    row = [
+                        document.name,
+                        document.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                    ]
+                    for i in range(len(field_names)):
+                        row.append(cell_rows[data_row_idx].get(i, ''))
+                    
+                    # Add confidence
+                    confidence = f"{document.confidence_score:.1f}%" if document.confidence_score else 'N/A'
+                    row.append(confidence)
+                    
+                    writer.writerow(row)
         else:
-            # Fill empty values
+            # No data - write empty row
+            row = [
+                document.name,
+                document.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            ]
             row.extend([''] * len(field_names))
-        
-        # Add confidence
-        confidence = f"{document.confidence_score:.1f}%" if document.confidence_score else 'N/A'
-        row.append(confidence)
-        
-        writer.writerow(row)
+            confidence = f"{document.confidence_score:.1f}%" if document.confidence_score else 'N/A'
+            row.append(confidence)
+            writer.writerow(row)
     
     # Create response
     response = HttpResponse(output.getvalue(), content_type='text/csv')
@@ -1062,3 +1134,41 @@ def template_export_all_documents_pdf(request, template_id):
         'document_count': documents.count()
     }
     return render(request, 'documents/template_export_pdf_form.html', context)
+
+
+def serve_document_file(request, document_id):
+    """Serve document file from database"""
+    from basemode.file_storage import serve_file_from_db
+    
+    document = get_object_or_404(Document, id=document_id)
+    
+    if not document.file_data:
+        # Fallback to file system if no DB data
+        if document.file:
+            from django.http import FileResponse
+            return FileResponse(document.file.open(), content_type=document.file_type or 'application/octet-stream')
+        return HttpResponse('File not found', status=404)
+    
+    return serve_file_from_db(
+        document.file_data,
+        document.file_name or 'document_file',
+        document.file_type or 'application/octet-stream',
+        as_attachment=False
+    )
+
+
+def serve_document_excel(request, document_id):
+    """Serve Excel file from database"""
+    from basemode.file_storage import serve_file_from_db
+    
+    document = get_object_or_404(Document, id=document_id)
+    
+    if not document.excel_data:
+        return HttpResponse('Excel file not found', status=404)
+    
+    return serve_file_from_db(
+        document.excel_data,
+        document.excel_name or f'{document.name}_extracted.xlsx',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True
+    )

@@ -187,9 +187,9 @@
                             {% endif %}
                         </div>
                         
-                        {% if document.text_content %}
+                        {% if document.text_version %}
                         <p class="card-text text-muted small">
-                            {{ document.text_content|truncatewords:30 }}
+                            {{ document.text_version|truncatewords:30 }}
                         </p>
                         {% endif %}
                         

@@ -18,6 +18,9 @@ urlpatterns = [
     path('<int:document_id>/export-pdf/', views.document_export_pdf, name='document_export_pdf'),
     path('<int:document_id>/download-excel/', views.document_download_excel, name='document_download_excel'),
     path('<int:document_id>/reextract-field/', views.document_reextract_field, name='document_reextract_field'),
+    # File serving (from database)
+    path('<int:document_id>/file/', views.serve_document_file, name='serve_document_file'),
+    path('<int:document_id>/excel-file/', views.serve_document_excel, name='serve_document_excel'),
     path('template/<int:template_id>/upload/', views.document_upload_with_template, name='document_upload_with_template'),
     path('template/<int:template_id>/export-all/', views.template_export_all_documents, name='template_export_all'),
     path('template/<int:template_id>/export-all-docx/', views.template_export_all_documents_docx, name='template_export_all_docx'),
